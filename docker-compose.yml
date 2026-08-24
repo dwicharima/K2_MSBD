@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: msbd-pg
+    environment:
+      POSTGRES_USER: msbd
+      POSTGRES_PASSWORD: msbd2026
+      POSTGRES_DB: latihan
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./dump:/dump
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U msbd"]
+      interval: 10s
+      retries: 5
+
+  mongo:
+    image: mongo:8
+    container_name: msbd-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: msbd
+      MONGO_INITDB_ROOT_PASSWORD: msbd2026
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongodata:/data/db
+
+  redis:
+    image: redis:7-alpine
+    container_name: msbd-redis
+    ports:
+      - "6379:6379"
+
+volumes:
+  pgdata:
+  mongodata:
