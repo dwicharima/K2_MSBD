@@ -103,4 +103,91 @@ $ docker compose exec postgres psql -U msbd -d pagila -c "\dt"
 
 4. Menjalankan query verifikasi V1-V4
 
+--> pertanma masuk ke pagila dulu
 
+PS D:\MSBD> docker compose exec postgres psql -U msbd -d pagila         
+psql (17.11 (Debian 17.11-1.pgdg13+2))
+Type "help" for help.
+
+pagila=# 
+
+--> setelah itu masukkan query nya
+
+== V1 ==
+pagila=# SELECT count(*)
+FROM information_schema.tables
+WHERE table_schema = 'public'
+  AND table_type = 'BASE TABLE';
+ count 
+-------
+    21
+(1 row)
+
+== V2 ==
+pagila=# SELECT relname,
+       pg_size_pretty(pg_total_relation_size(relid)) AS ukuran
+FROM pg_catalog.pg_statio_user_tables
+ORDER BY pg_total_relation_size(relid) DESC
+LIMIT 10;
+     relname      | ukuran  
+------------------+---------
+ rental           | 2472 kB
+ payment_p2017_04 | 1856 kB
+ payment_p2017_03 | 1536 kB
+ film             | 952 kB
+ payment_p2017_02 | 728 kB
+ film_actor       | 576 kB
+ payment_p2017_01 | 448 kB
+ inventory        | 440 kB
+ customer         | 224 kB
+ address          | 168 kB
+(10 rows)
+
+== V3 ==
+pagila=# SELECT f.title, count(*) AS total_sewa
+FROM rental r
+JOIN inventory i
+  ON i.inventory_id = r.inventory_id
+JOIN film f
+  ON f.film_id = i.film_id
+GROUP BY f.title
+ORDER BY total_sewa DESC
+LIMIT 5;
+        title        | total_sewa 
+---------------------+------------
+ BUCKET BROTHERHOOD  |         34
+ ROCKETEER MOTHER    |         33
+ RIDGEMONT SUBMARINE |         32
+ SCALAWAG DUCK       |         32
+ FORWARD TEMPLE      |         32
+(5 rows)
+
+== V4 ==
+pagila=# EXPLAIN ANALYZE
+SELECT f.title, count(*)
+FROM rental r
+JOIN inventory i
+  ON i.inventory_id = r.inventory_id
+JOIN film f
+  ON f.film_id = i.film_id
+GROUP BY f.title;
+                                                             QUERY PLAN                                                             
+------------------------------------------------------------------------------------------------------------------------------------
+ HashAggregate  (cost=761.19..771.19 rows=1000 width=23) (actual time=17.885..18.086 rows=958 loops=1)
+   Group Key: f.title
+   Batches: 1  Memory Usage: 193kB
+   ->  Hash Join  (cost=238.57..672.95 rows=17648 width=15) (actual time=2.208..13.536 rows=16044 loops=1)
+         Hash Cond: (i.film_id = f.film_id)
+         ->  Hash Join  (cost=128.07..515.92 rows=17648 width=2) (actual time=1.539..8.856 rows=16044 loops=1)
+               Hash Cond: (r.inventory_id = i.inventory_id)
+               ->  Seq Scan on rental r  (cost=0.00..341.48 rows=17648 width=4) (actual time=0.010..2.399 rows=16044 loops=1)
+               ->  Hash  (cost=70.81..70.81 rows=4581 width=6) (actual time=1.511..1.513 rows=4581 loops=1)
+                     Buckets: 8192  Batches: 1  Memory Usage: 234kB
+                     ->  Seq Scan on inventory i  (cost=0.00..70.81 rows=4581 width=6) (actual time=0.008..0.708 rows=4581 loops=1)
+         ->  Hash  (cost=98.00..98.00 rows=1000 width=19) (actual time=0.661..0.662 rows=1000 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 60kB
+               ->  Seq Scan on film f  (cost=0.00..98.00 rows=1000 width=19) (actual time=0.015..0.382 rows=1000 loops=1)
+ Planning Time: 0.628 ms
+ Execution Time: 18.193 ms
+(16 rows)
+ 
