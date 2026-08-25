@@ -55,12 +55,7 @@ msbd-pg  | 2026-08-25 07:39:05.719 UTC [1] LOG:  listening on Unix socket "/var/
 msbd-pg  | 2026-08-25 07:39:05.725 UTC [65] LOG:  database system was shut down at 2026-08-25 07:39:05 UTC
 msbd-pg  | 2026-08-25 07:39:05.730 UTC [1] LOG:  database system is ready to accept connections
 
-<<<<<<< HEAD
-
-
-
-
-
+===============================================================================================
 
 Langkah 4 : Restore Basis Data Pagila dan Verifikasi
 
@@ -107,3 +102,5 @@ $ docker compose exec postgres psql -U msbd -d pagila -c "\dt"
 (21 rows)
 
 4. Menjalankan query verifikasi V1-V4
+
+
