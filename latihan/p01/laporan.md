@@ -29,4 +29,60 @@ Kepentingannya untuk layanan lain sangat penting supaya layanan lain (seperti ba
 Jawaban : 
 Cara aman menyimpan password selain di docker-compose.yml yaitu dengan menggunakan file terpisah berbasis environment variables (seperti file .env) yang dipasangkan dengan fungsi environment. File .env ini nantinya ditambahkan ke dalam .gitignore supaya tidak ikut ter-upload. 
 Mengapa hal tersebut penting ketika masuk ke repositori Git? Agar data yang bersifat rahasi tidak bocor ke publik atau ketahuan orang lain di GitHub. Kalau file docker-compose.yml yang ada password-nya di-commit ke Git (terutama repositorinya public), siapa saja bisa melihat password database kita dan membahayakan keamanan sistem. 
- 
+
+
+Langkah 4
+== Restore Basis Data Pagila dan Verifikasi ==
+
+Setelah database pagila berhasil di-restore dari berkas dump, saya menjalankan empat query verifikasi (V1-V4) untuk memastikan datanya masuk dengan benar dan untuk melihat performa query di dalamnya.
+
+V1 - Jumlah tabel pada skema public Hasil: 21 tabel. Jumlah ini cocok dengan hasil \dt sebelumnya, jadi seluruh tabel dari dump pagila sudah masuk dengan lengkap ke skema public.
+
+V2 - Sepuluh tabel terbesar beserta ukurannya Hasil: 
+     relname      | ukuran  
+------------------+---------
+ rental           | 2472 kB
+ payment_p2017_04 | 1856 kB
+ payment_p2017_03 | 1536 kB
+ film             | 952 kB
+ payment_p2017_02 | 728 kB
+ film_actor       | 576 kB
+ payment_p2017_01 | 448 kB
+ inventory        | 440 kB
+ customer         | 224 kB
+ address          | 168 kB
+(10 rows)
+    Tabel rental paling besar karena menyimpan seluruh riwayat transaksi penyewaan film sedangkan tabel payment terpisah per bulan (partisi) sehingga ukurannya lebih kecil per tabelnya.
+
+V3 - Lima film dengan jumlah penyewaan terbanyak Hasil: 
+        title        | total_sewa 
+---------------------+------------
+ BUCKET BROTHERHOOD  |         34
+ ROCKETEER MOTHER    |         33
+ RIDGEMONT SUBMARINE |         32
+ SCALAWAG DUCK       |         32
+ FORWARD TEMPLE      |         32
+
+    Film "BUCKET BROTHERHOOD" adalah film yang paling sering disewa dengan 34 kali penyewaan.
+
+V4 - Melihat rencana eksekusi query (EXPLAIN ANALYZE) Hasil: 
+
+HashAggregate  (cost=761.19..771.19 rows=1000 width=23) (actual time=17.885..18.086 rows=958 loops=1)
+   Group Key: f.title
+   Batches: 1  Memory Usage: 193kB
+   ->  Hash Join  (cost=238.57..672.95 rows=17648 width=15) (actual time=2.208..13.536 rows=16044 loops=1)
+         Hash Cond: (i.film_id = f.film_id)
+         ->  Hash Join  (cost=128.07..515.92 rows=17648 width=2) (actual time=1.539..8.856 rows=16044 loops=1)
+               Hash Cond: (r.inventory_id = i.inventory_id)
+               ->  Seq Scan on rental r  (cost=0.00..341.48 rows=17648 width=4) (actual time=0.010..2.399 rows=16044 loops=1)
+               ->  Hash  (cost=70.81..70.81 rows=4581 width=6) (actual time=1.511..1.513 rows=4581 loops=1)
+                     Buckets: 8192  Batches: 1  Memory Usage: 234kB
+                     ->  Seq Scan on inventory i  (cost=0.00..70.81 rows=4581 width=6) (actual time=0.008..0.708 rows=4581 loops=1)
+         ->  Hash  (cost=98.00..98.00 rows=1000 width=19) (actual time=0.661..0.662 rows=1000 loops=1)
+               Buckets: 1024  Batches: 1  Memory Usage: 60kB
+               ->  Seq Scan on film f  (cost=0.00..98.00 rows=1000 width=19) (actual time=0.015..0.382 rows=1000 loops=1)
+ Planning Time: 0.628 ms
+ Execution Time: 18.193 ms
+
+-->pertanyaan:
+"Yang paling membingungkan dari keluaran ini adalah perbedaan antara angka cost (perkiraan biaya query menurut planner, sebelum query dijalankan) dengan actual time (waktu nyata dalam milidetik saat query benar-benar dieksekusi), serta banyaknya proses bertingkat seperti Hash Join dan Seq Scan yang saling bersarang sehingga sulit menentukan bagian mana yang paling menyita waktu hanya dengan sekali baca."
