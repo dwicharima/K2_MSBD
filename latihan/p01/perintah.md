@@ -54,3 +54,55 @@ msbd-pg  | 2026-08-25 07:39:05.714 UTC [1] LOG:  listening on IPv6 address "::",
 msbd-pg  | 2026-08-25 07:39:05.719 UTC [1] LOG:  listening on Unix socket "/var/run/postgresql/.s.PGSQL.5432"
 msbd-pg  | 2026-08-25 07:39:05.725 UTC [65] LOG:  database system was shut down at 2026-08-25 07:39:05 UTC
 msbd-pg  | 2026-08-25 07:39:05.730 UTC [1] LOG:  database system is ready to accept connections
+
+
+
+
+
+
+
+Langkah 4 : Restore Basis Data Pagila dan Verifikasi
+
+1. Membuat database kosong
+user@LAPTOP-JUQ5FG0Q MINGW64 /d/SEMESTER 3/MSBD/K2_MSBD (main)
+$ docker compose exec postgres createdb -U msbd pagila
+
+2. Restore Pagila
+user@LAPTOP-JUQ5FG0Q MINGW64 /d/SEMESTER 3/MSBD/K2_MSBD (main)
+$ docker compose exec postgres pg_restore -U msbd -d pagila --no-owner //dump/pagila.dump
+
+Catatan: menggunakan "//dump/pagila.dump" (bukan "/dump/pagila.dump") karena Git Bash
+(MINGW64) di Windows otomatis mengonversi path bergaya Unix menjadi path Windows lokal,
+sehingga path tujuan di dalam container jadi salah. Menambahkan garis miring ganda
+mencegah konversi tersebut.
+
+3. Verifikasi tabel
+user@LAPTOP-JUQ5FG0Q MINGW64 /d/SEMESTER 3/MSBD/K2_MSBD (main)
+$ docker compose exec postgres psql -U msbd -d pagila -c "\dt"
+                   List of relations
+ Schema |       Name       |       Type        | Owner 
+--------+------------------+-------------------+-------
+ public | actor            | table             | msbd
+ public | address          | table             | msbd
+ public | category         | table             | msbd
+ public | city             | table             | msbd
+ public | country          | table             | msbd
+ public | customer         | table             | msbd
+ public | film             | table             | msbd
+ public | film_actor       | table             | msbd
+ public | film_category    | table             | msbd
+ public | inventory        | table             | msbd
+ public | language         | table             | msbd
+ public | payment          | partitioned table | msbd
+ public | payment_p2017_01 | table             | msbd
+ public | payment_p2017_02 | table             | msbd
+ public | payment_p2017_03 | table             | msbd
+ public | payment_p2017_04 | table             | msbd
+ public | payment_p2017_05 | table             | msbd
+ public | payment_p2017_06 | table             | msbd
+ public | rental           | table             | msbd
+ public | staff            | table             | msbd
+ public | store            | table             | msbd
+(21 rows)
+
+4. Menjalankan query verifikasi V1-V4
