@@ -1,3 +1,16 @@
+Langkah 1 : 
+
+
+
+
+
+
+
+
+
+
+
+
 Langkah 2 
 Pertanyaan Wajib :
 
