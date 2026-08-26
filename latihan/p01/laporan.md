@@ -7,6 +7,8 @@ Anggota Kelompok :
 - Agnes Natalia Br Siregar (251402108)
 - Abdullah Zufar Aulia Nasution (251402111)
 
+---
+
 Langkah 1
 Pertanyaan Pemahaman :
 Jawab menggunakan kalimat Anda sendiri: 
@@ -22,6 +24,8 @@ Container adalah environment dengan versi dependency yang sama yang digunakan un
 3. Apa fungsi Volume? 
 Jawaban :
 Volume adalah penyimpanan aman yang digunakan untuk menyimpan data agar tetap ada meskipun container dihapus atau dibuat ulang. 
+
+---
 
 Langkah 2 
 Pertanyaan Wajib :
@@ -44,7 +48,9 @@ Jawaban :
 Cara aman menyimpan password selain di docker-compose.yml yaitu dengan menggunakan file terpisah berbasis environment variables (seperti file .env) yang dipasangkan dengan fungsi environment. File .env ini nantinya ditambahkan ke dalam .gitignore supaya tidak ikut ter-upload. 
 Mengapa hal tersebut penting ketika masuk ke repositori Git? Agar data yang bersifat rahasi tidak bocor ke publik atau ketahuan orang lain di GitHub. Kalau file docker-compose.yml yang ada password-nya di-commit ke Git (terutama repositorinya public), siapa saja bisa melihat password database kita dan membahayakan keamanan sistem. 
 
-Langkah 3 
+---
+
+Langkah 3 : Hasil tertera di folder "bukti"
 
 1. Satu aktivitas yang menurut Anda lebih cepat dilakukan menggunakan psql.
 Jawaban : 
@@ -58,6 +64,8 @@ Melihat dan memeriksa isi tabel karena data langsung ditampilkan dalam bentuk ta
 Jawaban : 
 Psql lebih praktis digunakan untuk menjalankan perintah SQL secara langsung melalui terminal. Cocok untuk aktivitas yang sederhana dan cepat, seperti menjalankan query, mengecek database, atau melakukan administrasi dasar tanpa membuka aplikasi dengan tampilan grafis. DBeaver lebih nyaman digunakan untuk mengelola dan melihat database melalui antarmuka grafis. DBeaver memudahkan ketika ingin melihat tabel, struktur kolom, isi data, relasi antar tabel, atau ER Diagram karena semuanya dapat ditampilkan secara visual.
 Jadi, psql lebih unggul untuk eksekusi perintah yang cepat dan langsung, sedangkan DBeaver lebih unggul untuk pengelolaan dan visualisasi database.
+
+---
 
 Langkah 4
 == Restore Basis Data Pagila dan Verifikasi ==
@@ -114,3 +122,7 @@ HashAggregate  (cost=761.19..771.19 rows=1000 width=23) (actual time=17.885..18.
 
 Pertanyaan:
 "Yang paling membingungkan dari keluaran ini adalah perbedaan antara angka cost (perkiraan biaya query menurut planner, sebelum query dijalankan) dengan actual time (waktu nyata dalam milidetik saat query benar-benar dieksekusi), serta banyaknya proses bertingkat seperti Hash Join dan Seq Scan yang saling bersarang sehingga sulit menentukan bagian mana yang paling menyita waktu hanya dengan sekali baca."
+
+---
+
+Repositori Kelompok

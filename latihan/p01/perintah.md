@@ -221,3 +221,39 @@ GROUP BY f.title;
  Execution Time: 18.193 ms
 (16 rows)
  
+ Tantangan Tambahan:
+
+ latihan=# CREATE TABLE besar AS
+SELECT g AS id,
+       md5(g::text) AS nilai
+FROM generate_series(1, 2000000) g;
+SELECT 2000000
+latihan=# EXPLAIN ANALYZE
+SELECT *
+FROM besar
+WHERE nilai = md5('1000000');
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
+ Gather  (cost=1000.00..29813.70 rows=10607 width=36) (actual time=54.070..88.072 rows=1 loops=1)
+   Workers Planned: 2
+   Workers Launched: 2
+   ->  Parallel Seq Scan on besar  (cost=0.00..27753.00 rows=4420 width=36) (actual time=68.328..79.038 rows=0 loops=3)
+         Filter: (nilai = '8155bc545f84d9652f1012ef2bdfb6eb'::text)
+         Rows Removed by Filter: 666666
+ Planning Time: 0.602 ms
+ Execution Time: 88.150 ms
+(8 rows)
+
+latihan=# CREATE INDEX idx_besar_nilai ON besar(nilai);
+CREATE INDEX
+latihan=# EXPLAIN ANALYZE
+SELECT *
+FROM besar
+WHERE nilai = md5('1000000');
+                                                       QUERY PLAN                                                       
+------------------------------------------------------------------------------------------------------------------------
+ Index Scan using idx_besar_nilai on besar  (cost=0.55..8.57 rows=1 width=37) (actual time=0.105..0.107 rows=1 loops=1)
+   Index Cond: (nilai = '8155bc545f84d9652f1012ef2bdfb6eb'::text)
+ Planning Time: 1.065 ms
+ Execution Time: 0.208 ms
+(4 rows)
