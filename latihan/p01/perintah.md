@@ -1,13 +1,43 @@
-Langkah 1 :
+Langkah 1 : Verifikasi Docker
 
+1. Hasil dari perintah "docker --version"
+PS C:\Users\Fakhry Adrian\OneDrive\Documents\Tubes_MSBD\K2_MSBD> docker --version
+Docker version 29.7.2, build a7dcaa6
 
+2. Hasil dari perintah "docker compose version"
+PS C:\Users\Fakhry Adrian\OneDrive\Documents\Tubes_MSBD\K2_MSBD> docker compose version
+Docker Compose version v5.4.0
 
+3. Hasil dari perintah "docker run --rm hello-world"
+PS C:\Users\Fakhry Adrian\OneDrive\Documents\Tubes_MSBD\K2_MSBD> docker run --rm hello-world
 
+Hello from Docker!
+This message shows that your installation appears to be working correctly.
 
+To generate this message, Docker took the following steps:
+ 1. The Docker client contacted the Docker daemon.
+ 2. The Docker daemon pulled the "hello-world" image from the Docker Hub.
+    (amd64)
+ 3. The Docker daemon created a new container from that image which runs the
+    executable that produces the output you are currently reading.
+ 4. The Docker daemon streamed that output to the Docker client, which sent it
+    to your terminal.
 
+To try something more ambitious, you can run an Ubuntu container with:
+ $ docker run -it ubuntu bash
 
+Share images, automate workflows, and more with a free Docker ID:
+ https://hub.docker.com/
 
+For more examples and ideas, visit:
+ https://docs.docker.com/get-started/
 
+4. Hasil dari perintah "docker compose ps"
+PS C:\Users\Fakhry Adrian\OneDrive\Documents\Tubes_MSBD\K2_MSBD> docker compose ps
+NAME         IMAGE            COMMAND                  SERVICE    CREATED             STATUS                       PORTS
+msbd-mongo   mongo:8          "docker-entrypoint.s…"   mongo      35 hours ago        Up About an hour             0.0.0.0:27017->27017/tcp, [::]:27017->27017/tcp
+msbd-pg      postgres:17      "docker-entrypoint.s…"   postgres   About an hour ago   Up About an hour (healthy)   0.0.0.0:5432->5432/tcp, [::]:5432->5432/tcp
+msbd-redis   redis:7-alpine   "docker-entrypoint.s…"   redis      35 hours ago        Up About an hour             0.0.0.0:6379->6379/tcp, [::]:6379->6379/tcp
 
 Langkah 2 :
 
