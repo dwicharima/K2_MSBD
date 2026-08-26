@@ -1,14 +1,16 @@
 Langkah 1 : 
+Pertanyaan Pemahaman 
 
+Jawab menggunakan kalimat Anda sendiri: 
 
+1. Apa yang dimaksud dengan Docker Image? 
+Docker Image adalah blueprint yang berisi kebutuhan-kebutuhan kita untuk menjalankan sebuah aplikasi di dalam kontainer Docker. 
 
+2. Apa yang dimaksud dengan Container? 
+Container adalah environment dengan versi dependency yang sama yang digunakan untuk menjalankan aplikasi beserta semua yang diperlukan pada aplikasi tersebut. 
 
-
-
-
-
-
-
+3. Apa fungsi Volume? 
+Volume adalah penyimpanan aman yang digunakan untuk menyimpan data agar tetap ada meskipun container dihapus atau dibuat ulang. 
 
 
 Langkah 2 
