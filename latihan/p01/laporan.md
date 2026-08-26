@@ -17,7 +17,7 @@ Langkah 2
 Pertanyaan Wajib :
 
 1. Apa yang terjadi jika bagian volumes: pada layanan PostgreSQL dihapus, kemudian container dihentikan menggunakan docker compose down -v? 
-Jawabannya : Semua data di dalam database PostgreSQL bakal terhapus secara permanen. Perintah down -v otomatis menghapus named volume (pgdata) tempat penyimpanan berkas fisik database di luar containernya. Tanpa volumes, data juga tidak akan tersimpan secara aman jika container dimatikan. 
+Jawaban : Semua data di dalam database PostgreSQL bakal terhapus secara permanen. Perintah down -v otomatis menghapus named volume (pgdata) tempat penyimpanan berkas fisik database di luar containernya. Tanpa volumes, data juga tidak akan tersimpan secara aman jika container dimatikan. 
 
 2. Mengapa pemetaan port ditulis "5432:5432" dan bukan cukup satu angka? Apa yang harus diubah apabila komputer Anda sudah memiliki PostgreSQL lain yang menggunakan port 5432? 
 Jawaban : Karena angka pertama 5432 adalah port di host, sedangkan angka kedua 5432 adalah port yang berjalan di dalam container Docker. Kedua angka ini diperlukan untuk menjembatani koneksi dari luar ke dalam container. Kita harus mengubah angka bagian depan menjadi port lain yang masih kosong, misalnya "5433:5432", sehingga akses dari luar laptop akan melalui port 5433 dan diarahkan ke port 5432 di dalam container. 
@@ -32,6 +32,18 @@ Jawaban :
 Cara aman menyimpan password selain di docker-compose.yml yaitu dengan menggunakan file terpisah berbasis environment variables (seperti file .env) yang dipasangkan dengan fungsi environment. File .env ini nantinya ditambahkan ke dalam .gitignore supaya tidak ikut ter-upload. 
 Mengapa hal tersebut penting ketika masuk ke repositori Git? Agar data yang bersifat rahasi tidak bocor ke publik atau ketahuan orang lain di GitHub. Kalau file docker-compose.yml yang ada password-nya di-commit ke Git (terutama repositorinya public), siapa saja bisa melihat password database kita dan membahayakan keamanan sistem. 
 
+Langkah 3 
+1. Satu aktivitas yang menurut Anda lebih cepat dilakukan menggunakan psql.
+Jawaban: 
+Menjalankan beberapa perintah SQL secara langsung, terutama saat ingin melakukan pengecekan sederhana terhadap database. Dengan psql, perintah bisa langsung ditulis di terminal sehingga prosesnya lebih praktis dan tidak perlu berpindah-pindah tampilan.
+
+2. Satu aktivitas yang menurut Anda lebih cepat dilakukan menggunakan DBeaver.
+Jawab: Melihat dan memeriksa isi tabel karena data langsung ditampilkan dalam bentuk tabel yang rapi. DBeaver juga memudahkan untuk melihat kolom dan isi data tanpa harus menulis query untuk setiap pengecekan.
+
+3. Perbandingan penggunaan psql dan DBeaver
+Jawab: psql lebih praktis digunakan untuk menjalankan perintah SQL secara langsung melalui terminal. Cocok untuk aktivitas yang sederhana dan cepat, seperti menjalankan query, mengecek database, atau melakukan administrasi dasar tanpa membuka aplikasi dengan tampilan grafis. DBeaver lebih nyaman digunakan untuk mengelola dan melihat database melalui antarmuka grafis. DBeaver memudahkan ketika ingin melihat tabel, struktur kolom, isi data, relasi antar tabel, atau ER Diagram karena semuanya dapat ditampilkan secara visual.
+
+Jadi, psql lebih unggul untuk eksekusi perintah yang cepat dan langsung, sedangkan DBeaver lebih unggul untuk pengelolaan dan visualisasi database.
 
 Langkah 4
 == Restore Basis Data Pagila dan Verifikasi ==
