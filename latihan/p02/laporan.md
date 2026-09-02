@@ -1,4 +1,4 @@
-# Laporan Latihan - Pertemuan 1 - Kelompok 2 - Manajemen Sistem Basis Data**
+# Laporan Latihan - Pertemuan 1 - Kelompok 2 - Manajemen Sistem Basis Data
 
 **Anggota Kelompok :**
 - Rasyd Arija Azron Ritonga (251402020)
@@ -7,6 +7,26 @@
 - Agnes Natalia Br Siregar (251402108)
 - Abdullah Zufar Aulia Nasution (251402111)
 
+---
+
+### Nama domain dan alasan kelompok memilih domain tersebut.
+
+Nama Domain : Manajemen Kompetisi Antar-Mahasiswa. 
+Alasan kami memilih domain ini karena awalnya kami mencari beberapa referensi dari AI untuk mendapatkan beberapa kandidat domain yang bisa digunakan. Setelah melihat dan mempertimbangkan beberapa pilihan, kami akhirnya memilih Manajemen Kompetisi Antar-Mahasiswa.
+
+Kami memilih domain ini karena menurut kami alur kegiatannya cukup jelas dan mudah dipahami. Mulai dari mahasiswa yang membentuk tim, mendaftarkan tim ke kompetisi, mengikuti pertandingan, sampai proses penilaian oleh juri. Data-data yang ada juga saling berhubungan, sehingga menurut kami domain ini cukup menarik dan cocok untuk dibuat ke dalam ERD. Selain itu, terdapat hubungan M dan aturan bisnis yang bisa dikembangkan, sehingga dapat memenuhi kebutuhan tugas yang dib
+
+---
+
+### Ringkasan Lingkup Sistem
+
+Sistem ini digunakan untuk mengelola kompetisi antar-mahasiswa, mulai dari pendataan mahasiswa dan tim, pendaftaran tim ke kompetisi, penjadwalan pertandingan, pendataan juri, hingga pencatatan penilaian dan hasil pertandingan. Sistem tidak mencakup pengelolaan data akademik mahasiswa secara keseluruhan, pembayaran, pengadaan perlengkapan, maupun penggajian juri.
+
+---
+
+### Ringkasan Kebutuhan Data
+
+Kebutuhan data yang kami buat meliputi data mahasiswa, tim, keanggotaan tim, kompetisi, pendaftaran tim, pertandingan, juri dan penugasan juri, serta penilaian. Data-data tersebut digunakan untuk mencatat siapa saja yang mengikuti kompetisi, tim yang terdaftar, hubungan anggota dengan tim, jadwal dan hasil pertandingan, juri yang bertugas, serta nilai yang diberikan. Kebutuhan data ini saling berhubungan sehingga dapat menggambarkan proses kompetisi dari awal pendaftaran sampai penilaian dan hasil pertandingan.
 
 ---
 
@@ -19,7 +39,7 @@ Mengapa lingkungan pengujian memerlukan basis data sendiri, dan bukan sekadar sc
 
 ---
 
-## Langkah 2
+### Langkah 2
 
 **Pertanyaan 2**
 Pilih satu kebutuhan yang memiliki aturan paling rumit. Menurut kelompok kalian, apakah aturan tersebut lebih tepat ditegakkan menggunakan constraint, trigger, atau kode aplikasi? Berikan satu alasan.
@@ -28,7 +48,7 @@ Pilih satu kebutuhan yang memiliki aturan paling rumit. Menurut kelompok kalian,
 
 ---
 
-## Langkah 4
+### Langkah 4
 
 **Pertanyaan 5**
 Seorang anggota kelompok mengubah isi V1__skema_awal.sql setelah migration tersebut sudah diterapkan, kemudian melakukan push ke repositori. Apa yang terjadi ketika anggota lain menjalankan migration? Jelaskan penyebab error dan cara memperbaikinya tanpa menghapus riwayat migration.
