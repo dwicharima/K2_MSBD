@@ -33,6 +33,19 @@ services:
     ports:
       - "6379:6379"
 
+  flyway:
+    image: flyway/flyway:11
+    depends_on:
+      - postgres
+    volumes:
+      - ./latihan/p02/migrations:/flyway/sql
+    command: >
+      -url=jdbc:postgresql://postgres:5432/latihan
+      -user=msbd
+      -password=msbd2026
+      -connectRetries=10
+      migrate
+
 volumes:
   pgdata:
   mongodata:
