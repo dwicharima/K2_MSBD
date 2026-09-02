@@ -111,3 +111,28 @@ Catat apa yang terlihat pada pg_stat_activity. Perintah mana yang menunggu? Apa 
 > Pada `pg_stat_activity`, terlihat bahwa perintah `ALTER TABLE peminjaman ADD COLUMN catatan text` berada dalam keadaan `active` tetapi menunggu, dengan `wait_event_type` bernilai `Lock`. Perintah tersebut menunggu karena Terminal 1 masih memiliki transaksi yang mengakses tabel `peminjaman` dan belum melakukan `COMMIT` atau `ROLLBACK`. Perintah `ALTER TABLE` membutuhkan kunci eksklusif pada tabel tersebut.
 >
 > Jika kondisi ini terjadi pada basis data produksi ketika banyak pengguna mengakses sistem, perubahan struktur tabel akan tertunda dan transaksi lain yang membutuhkan tabel tersebut dapat ikut mengantre. Akibatnya, waktu respons aplikasi menjadi lambat, query dapat mengalami timeout, dan pada kondisi parah layanan dapat terganggu sementara.
+
+### Langkah 6
+
+**Pertanyaan 7**
+Mengapa seed data tidak diletakkan langsung di dalam migrations/? Sebutkan satu perbedaan sifat antara migration dan seed data.
+
+> Seed data tidak diletakkan di dalam migrations/ karena sifat keduanya berbeda. Migration
+> bersifat sekali jalan dan permanen — setiap file migration hanya boleh dieksekusi satu kali
+> dan tidak boleh diubah setelah diterapkan, karena Flyway mencatat riwayatnya berdasarkan
+> checksum. Sedangkan seed data bersifat dapat dijalankan berulang kali (idempoten) dan
+> boleh diubah atau dijalankan ulang kapan saja tanpa merusak riwayat skema. Jika seed
+> digabung ke migrations/, setiap kali data contoh perlu diperbarui, kita harus membuat
+> migration baru — padahal migration seharusnya hanya mencatat perubahan struktur skema,
+> bukan perubahan data operasional/contoh.
+
+**Hasil Seed Data (dijalankan dua kali)**
+
+Seed data pada `latihan/p02/seeds/01_mahasiswa.sql` mengisi 5 baris data mahasiswa
+menggunakan `INSERT ... ON CONFLICT (nim) DO UPDATE`. Karena `nim` merupakan primary key
+pada tabel `mahasiswa`, menjalankan seed dua kali tidak menghasilkan data ganda — baris
+dengan nim yang sudah ada akan diperbarui (UPDATE), bukan disisipkan ulang.
+
+Hasil verifikasi `SELECT count(*) FROM mahasiswa;` menunjukkan jumlah baris tetap **5**
+baik setelah eksekusi pertama maupun kedua. Bukti screenshot tersedia pada
+`latihan/p02/bukti/langkah 6 - 1.png` dan `langkah 6 - 2.png`.
