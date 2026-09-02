@@ -49,6 +49,21 @@ Pilih satu kebutuhan yang memiliki aturan paling rumit. Menurut kelompok kalian,
 
 ---
 
+## Langkah 3
+
+**Pertanyaan 3**
+Mengapa Peminjaman dan Unit Alat pada contoh tidak dihubungkan langsung, tetapi melalui Baris Pinjam? Apa yang hilang jika hubungan dibuat langsung?
+
+>Karena entitas "Peminjaman" dan "Unit Alat" tidak dihubungkan langsung karena hubungan tersebut merupakan many-to-many (M:N). Oleh karena itu, diperlukan entitas perantara "Baris Pinjam" untuk mencatat setiap unit alat yang masuk ke dalam suatu transaksi peminjaman. Jika entitas "Peminjaman" langsung berhubungan dengan "Unit Alat", kita kehilangan tempat yang tepat untuk menyimpan detail setiap unit dalam suatu transaksi peminjaman. Selain itu, model menjadi sulit menangani satu transaksi yang meminjam banyak unit dan satu unit yang dipinjam berkali-kali.
+
+
+**Pertanyaan 4**
+Apa perbedaan antara entitas Alat dan Unit Alat? Sebutkan satu pertanyaan bisnis yang hanya dapat dijawab jika keduanya dipisahkan.
+
+>Entitas "Alat" merepresentasikan jenis/model alat, sedangkan entitas "Unit Alat" merepresentasikan barang fisik/instance nyata dari alat tersebut. Contohnya, data dari entitas "Alat" yaitu Asus TUF Gaming A15, sedangkan data dari entitas "Unit Alat" adalah 5 laptop Asus TUF Gaming A15 dengan kode inventaris yang berbeda-beda. Misal, laptop dengan kode "ATG-001", "ATG-002", "ATG-003", dan seterusnya. Jadi, satu Alat dapat memiliki banyak Unit Alat. Pertanyaan bisnis yang membutuhkan kedua entitas tersebut dipisah ialah, "Berapa unit Proyektor Epson EB-X06 yang saat ini tersedia untuk dipinjam?"
+
+---
+
 ### Langkah 4
 
 **Pertanyaan 5**
@@ -83,7 +98,7 @@ Cara yang benar sesuai aturan database:
 
 ### Langkah 5
 
-**pertanyaan 6**
+**Pertanyaan 6**
 
 Catat apa yang terlihat pada pg_stat_activity. Perintah mana yang menunggu? Apa akibatnya jika kondisi tersebut terjadi pada basis data produksi saat banyak pengguna sedang mengakses sistem?
 
