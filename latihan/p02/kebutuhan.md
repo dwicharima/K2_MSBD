@@ -1,7 +1,5 @@
 #### B. Tuliskan Lingkup
 
-## Lingkup
-
 | Termasuk | Tidak termasuk |
 |---|---|
 | Pendataan mahasiswa dan anggota tim | Data akademik mahasiswa secara keseluruhan |

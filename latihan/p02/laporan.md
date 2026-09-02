@@ -14,7 +14,7 @@
 Nama Domain : Manajemen Kompetisi Antar-Mahasiswa. 
 Alasan kami memilih domain ini karena awalnya kami mencari beberapa referensi dari AI untuk mendapatkan beberapa kandidat domain yang bisa digunakan. Setelah melihat dan mempertimbangkan beberapa pilihan, kami akhirnya memilih Manajemen Kompetisi Antar-Mahasiswa.
 
-Kami memilih domain ini karena menurut kami alur kegiatannya cukup jelas dan mudah dipahami. Mulai dari mahasiswa yang membentuk tim, mendaftarkan tim ke kompetisi, mengikuti pertandingan, sampai proses penilaian oleh juri. Data-data yang ada juga saling berhubungan, sehingga menurut kami domain ini cukup menarik dan cocok untuk dibuat ke dalam ERD. Selain itu, terdapat hubungan M dan aturan bisnis yang bisa dikembangkan, sehingga dapat memenuhi kebutuhan tugas yang dib
+Kami memilih domain ini adalah karena manajemen kompetisi antar-mahasiswa merupakan kegiatan yang cukup sering dilakukan, baik dalam lingkup fakultas, universitas, maupun dengan pihak di luar kampus. Dalam pelaksanaannya, diperlukan pengelolaan data yang terstruktur agar proses pendaftaran peserta, pembentukan tim, penjadwalan pertandingan, hingga penilaian dapat berjalan dengan baik. Domain ini juga menarik karena memiliki beberapa aturan bisnis yang cukup kompleks, seperti batas jumlah anggota dalam tim, periode pendaftaran, bentroknya jadwal pertandingan, serta ketentuan bahwa hanya tim yang sudah terdaftar yang dapat mengikuti pertandingan. Oleh karena itu, kami merasa domain ini cocok untuk dipraktikkan dalam perancangan basis data.
 
 ---
 
@@ -27,6 +27,12 @@ Sistem ini digunakan untuk mengelola kompetisi antar-mahasiswa, mulai dari penda
 ### Ringkasan Kebutuhan Data
 
 Kebutuhan data yang kami buat meliputi data mahasiswa, tim, keanggotaan tim, kompetisi, pendaftaran tim, pertandingan, juri dan penugasan juri, serta penilaian. Data-data tersebut digunakan untuk mencatat siapa saja yang mengikuti kompetisi, tim yang terdaftar, hubungan anggota dengan tim, jadwal dan hasil pertandingan, juri yang bertugas, serta nilai yang diberikan. Kebutuhan data ini saling berhubungan sehingga dapat menggambarkan proses kompetisi dari awal pendaftaran sampai penilaian dan hasil pertandingan.
+
+---
+
+### Penjelasan singkat ERD
+
+Mahasiswa dapat bergabung ke beberapa Tim, dan satu tim dapat memiliki beberapa mahasiswa. Hubungan M:N ini direalisasikan melalui Keanggotaan_Tim. Tim dapat mendaftar pada beberapa Kompetisi, dan satu kompetisi dapat diikuti banyak tim. Hubungan M:N ini direalisasikan melalui Pendaftaran_Tim. Setiap Kompetisi memiliki satu Kategori, sedangkan satu kategori dapat digunakan oleh beberapa kompetisi. Kompetisi memiliki beberapa Pertandingan yang diikuti oleh tim. Setiap Pertandingan dapat memiliki beberapa Penilaian, dan penilaian diberikan oleh Juri.
 
 ---
 
