@@ -135,4 +135,4 @@ dengan nim yang sudah ada akan diperbarui (UPDATE), bukan disisipkan ulang.
 
 Hasil verifikasi `SELECT count(*) FROM mahasiswa;` menunjukkan jumlah baris tetap **5**
 baik setelah eksekusi pertama maupun kedua. Bukti screenshot tersedia pada
-`latihan/p02/bukti/langkah 6 - 1.png` dan `langkah 6 - 2.png`.
+`latihan/p02/bukti/langkah 6 - 1.png`.

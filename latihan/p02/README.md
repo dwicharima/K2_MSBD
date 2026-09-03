@@ -29,7 +29,7 @@
 ---
 
 ### Cara Menjalankan Seed Data
-Untuk menjalankan seed data, gunakan perintah berikut untuk memasukkan data awal dari file 01_peran.sql ke database proyek_dev:
-docker compose exec -T postgres psql -U msbd -d proyek_dev < latihan/p02/seeds/01_peran.sql
+Untuk menjalankan seed data, gunakan perintah berikut untuk memasukkan data awal dari file 01_mahasiswa.sql ke database proyek_dev:
+docker compose exec -T postgres psql -U msbd -d proyek_dev < latihan/p02/seeds/01_mahasiswa.sql
 
 ---
