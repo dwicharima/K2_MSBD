@@ -136,3 +136,20 @@ dengan nim yang sudah ada akan diperbarui (UPDATE), bukan disisipkan ulang.
 Hasil verifikasi `SELECT count(*) FROM mahasiswa;` menunjukkan jumlah baris tetap **5**
 baik setelah eksekusi pertama maupun kedua. Bukti screenshot tersedia pada
 `latihan/p02/bukti/langkah 6 - 1.png`.
+
+### Daftar Commit Masing-Masing Anggota
+
+| Anggota | Commit |
+|---|---|
+| *Dwi CharimaHusni* | docs: menentukan nama domain dan alasan kelompok memilih domain tersebut
+docs: menyusun ringkasan lingkup sistem
+docs: menyusun ringkasan kebutuhan data dan aturan bisnis|
+| *Rasyd Arija R Ritonga* | feat: melakukan evolusi skema secara aman
+feat: melakukan eksperimen locking pada database
+docs: melengkapi bukti pg_stat_activity |
+| *Fakhry Adrian* | docs: memperbarui laporan dan melengkapi laporan.md <br> feat: menambahkan seed yang tidak menggandakan data |
+| *Agnes Natalia Br Siregar* | feat: menyiapkan dua database baru untuk lingkungan pengujian
+feat: membuat ERD konseptual dan menentukan relasi antarentitas |
+| *Abdullah Zufar Aulia* | feat: membuat seed data idempoten
+feat: menguji seed agar tidak menghasilkan data ganda
+docs: melengkapi bukti pengujian seed data |
