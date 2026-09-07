@@ -1,16 +1,15 @@
-# Laporan Latihan - Pertemuan 3 - Kelompok 2 - Manajemen Sistem Basis Data
+# Laporan Latihan Kelompok 2 Pertemuan 3
 
-**Anggota Kelompok :**
+## Anggota Kelompok
 
-- Rasyd Arija Azron Ritonga (251402020)
-- Fakhry Adrian Daulay (251402053)
-- Dwi Charima Husni (251402088) - Project Manager
-- Agnes Natalia Br Siregar (251402108)
-- Abdullah Zufar Aulia Nasution (251402111)
+- Rasyd Arija Azron Ritonga | 251402020 |
+- Fakhry Adrian Daulay | 251402053 |
+- Dwi Charima Husni | 251402088 |- Project Manager
+- Agnes Natalia Br Siregar | 251402108 |
+- Abdullah Zufar Aulia Nasution | 251402111 |
 
-### Langkah 3
 
-**Pertanyaan Reflektif A**
+## Refleksi A - Subquery
 
 1. Pada Q4, apa tepatnya yang membuat NOT IN berbahaya, dan bagaimana memeriksa apakah sebuah kolom rawan terhadap masalah itu?
 > Penyebab bahaya NOT IN adalah mengevaluasi kondisi keanggotaan menggunakan logika tiga nilai (Three-Valued Logic) SQL (TRUE, FALSE, UNKNOWN). Jika subquery mengembalikan bahkan satu saja nilai NULL, seluruh ekspresi WHERE col NOT IN akan mengevaluasi baris menjadi UNKNOWN (karena tidak bisa memastikan apakah sebuah nilai yang tidak diketahui cocok atau tidak). Akibatnya, query langsung mengembalikan 0 baris (kosong) tanpa error sama sekali.
