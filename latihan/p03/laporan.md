@@ -35,7 +35,20 @@ Tapi, Pada mesin database, hal itu belum tentu dikerjakan seperti itu. Query Opt
 2. Kapan mengganti UNION ALL dengan UNION dapat menghentikan siklus, dan mengapa itu tetap bukan solusi yang baik?
 > UNION hanya menghentikan siklus kalau baris yang berulang persis sama di semua kolom. Pada Q7, kolom level dan jalur selalu berubah tiap putaran, jadi baris tidak pernah benar-benar identik dan siklus tetap jalan terus — UNION tidak bisa diandalkan. Selain itu UNION lebih mahal karena harus membandingkan seluruh kolom setiap baris untuk deteksi duplikat, padahal solusi seperti array jalur (NOT (id = ANY(jalur_id))) langsung menyasar akar masalah (id yang berulang) dengan biaya lebih murah dan maksud yang lebih jelas.
 
-##  Reflektif D
+## Refleksi C - Window Function
+1. Pada Q14, berapa tanggal yang berbeda, dan sifat data apa pada tabel payment yang menyebabkan perbedaan?
+> Pada Q14, jumlah tanggal kalender yang berbeda lebih sedikit daripada jumlah baris pada tabel payment. Penyebabnya adalah satu tanggal dapat memiliki banyak transaksi pembayaran. Selain itu, kolom payment_date menyimpan informasi tanggal dan waktu, sehingga beberapa transaksi yang terjadi pada tanggal kalender yang sama tetap memiliki nilai payment_date yang berbeda.
+
+2. Jika Q13 menjadi laporan resmi keuangan, versi mana yang benar dan mengapa kesalahan frame sulit ditemukan melalui pengujian biasa?
+> Pada Q13, versi query yang benar untuk laporan keuangan adalah query yang terlebih dahulu mengubah data transaksi pada tabel payment menjadi omzet per hari, kemudian menerapkan window function pada hasil agregasi harian tersebut. Untuk omzet kumulatif digunakan frame ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW, sedangkan untuk rata-rata bergerak tujuh hari digunakan ROWS BETWEEN 6 PRECEDING AND CURRENT ROW.
+
+Kesalahan frame sulit ditemukan karena query tetap berjalan tanpa error dan menghasilkan angka yang terlihat wajar, tetapi ROWS menghitung jumlah baris, bukan jumlah hari. Jika satu hari memiliki banyak transaksi, tujuh baris belum tentu berarti tujuh hari.
+
+3. Pada Q15, apa yang terjadi pada total belanja jika ORDER BY ditambahkan ke dalam OVER tanpa menuliskan frame?
+> Jika frame dihilangkan sementara ORDER BY tetap digunakan, PostgreSQL menggunakan frame default sampai CURRENT ROW, sehingga SUM() berubah menjadi total kumulatif pelanggan.
+
+##  Reflektif D - Agregasi dan Operasi Himpunan
+
 1. Pada Q16, tanpa GROUPING(), bagaimana pembaca membedakan subtotal dari baris data yang kolomnya memang kosong?
 > Pada Q16, tanpa GROUPING(), pembaca sulit membedakan apakah nilai NULL pada kolom hasil grouping merupakan subtotal atau memang nilai kolom data yang kosong (NULL). GROUPING() digunakan untuk menandai apakah NULL tersebut berasal dari baris subtotal/rollup atau dari data asli.
 
