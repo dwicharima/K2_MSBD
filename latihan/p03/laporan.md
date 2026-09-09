@@ -2,12 +2,13 @@
 
 ## Anggota Kelompok
 
-- Rasyd Arija Azron Ritonga | 251402020 |
-- Fakhry Adrian Daulay | 251402053 |
-- Dwi Charima Husni | 251402088 |- Project Manager
-- Agnes Natalia Br Siregar | 251402108 |
-- Abdullah Zufar Aulia Nasution | 251402111 |
-
+| Nama | NIM | Kontribusi |
+|------|-----|------------|
+| Agnes Natalia Br Siregar| 251402108 | Q1-Q5 (Subquery), Refleksi A, setup q00 |
+| Abdullah Zufar Aulia Nasution | 251402111 | Q6-Q9 (CTE & Recursive CTE), Refleksi B |
+| Fakhry Adrian Daulay | 251402053 | Q10-Q13 (Window Function), Refleksi C |
+| Rasyd Arija Azron Ritonga | 251402020 | Q14–Q15 (Window Function), Q16–Q17 (Agregasi Lanjutan), Refleksi C-D |
+| Dwi Charima Husni | 251402088 | Q16-Q20 (Agregasi & JSONB), R1, Refleksi E |
 
 ## Refleksi A - Subquery
 
@@ -54,3 +55,23 @@ Kesalahan frame sulit ditemukan karena query tetap berjalan tanpa error dan meng
 
 2. Pada Q17, mengapa versi FILTER dan CASE WHEN dapat memberi rata-rata berbeda walaupun jumlah baris sama?
 > Pada Q17, FILTER dan CASE WHEN dapat menghasilkan rata-rata berbeda karena cara menghitungnya berbeda. FILTER menghitung agregat hanya pada baris yang memenuhi kondisi, sedangkan CASE WHEN dapat menghasilkan NULL pada baris yang tidak memenuhi kondisi dan kemudian AVG() hanya menghitung nilai yang bukan NULL. Jika ekspresi atau kondisi yang digunakan tidak benar-benar ekuivalen, jumlah baris yang masuk ke perhitungan rata-rata bisa berbeda, sehingga hasil AVG() juga berbeda.
+
+## Refleksi E - JSONB
+1. Dari nomor transaksi, status, jumlah, dan identitas pelanggan di dalam payload, mana yang sebaiknya dipromosikan menjadi kolom relasional dengan constraint dan mana yang tepat tetap berada di JSON? Berikan alasan untuk setiap pilihan.
+> Data di dalam payload dapat dibagi berdasarkan seberapa sering data tersebut digunakan dan seberapa penting aturan yang perlu diterapkan.
+- Nomor transaksi → lebih baik dijadikan kolom relasional karena setiap transaksi membutuhkan identitas yang jelas dan konsisten. Kolom ini juga dapat diberi constraint, seperti UNIQUE, agar tidak ada nomor transaksi yang sama.
+- Status → lebih baik menjadi kolom relasional karena biasanya sering digunakan untuk pencarian, filtering, dan menentukan kondisi suatu transaksi. Nilainya juga dapat dibatasi agar hanya menggunakan status yang valid dan konsisten.
+- Jumlah → lebih baik menjadi kolom relasional dengan tipe data numerik. Dengan begitu, data jumlah dapat langsung digunakan untuk berbagai perhitungan, seperti total pendapatan, rata-rata, atau laporan transaksi, tanpa perlu melakukan konversi dari teks terlebih dahulu.
+- Identitas pelanggan → lebih cocok dijadikan data relasional apabila data pelanggan sering digunakan untuk pencarian atau dihubungkan dengan transaksi lain. Namun, informasi tambahan pelanggan yang sifatnya lebih fleksibel dan tidak selalu sama pada setiap transaksi masih dapat tetap disimpan dalam JSON.
+
+Jadi, data yang sering digunakan untuk pencarian, perhitungan, dan memiliki aturan tertentu lebih baik dipromosikan menjadi kolom relasional. Sementara itu, JSON tetap berguna untuk menyimpan informasi tambahan yang lebih fleksibel dan memungkinkan strukturnya berbeda-beda.
+
+## Temuan Q14
+
+
+## Hasil R1
+![Sepuluh baris pertama](r1_10_baris.png)
+
+ ## Tautan Merge Request
+
+ https://github.com/dwicharima/K2_MSBD

@@ -38,8 +38,8 @@ Untuk membuat kondisi siklus dan menguji apakah query rekursif dapat menangani s
 - Agnes: Q1-Q5 (Subquery), Refleksi A, setup q00
 - Abdullah: Q6-Q9 (CTE & Recursive CTE), Refleksi B
 - Fakhry: Q10-Q13 (Window Function), Refleksi C
-- Rasyd: Q14–Q15 (Window Function), Q16–Q17 (Agregasi Lanjutan), Refleksi C
-- Dwi: Q18-Q20 (Agregasi & JSONB), R1, Refleksi D-E
+- Rasyd: Q14–Q15 (Window Function), Q16–Q17 (Agregasi Lanjutan), Refleksi C-D
+- Dwi: Q18-Q20 (Agregasi & JSONB), R1, Refleksi E
 
 ## Anggota 
 
