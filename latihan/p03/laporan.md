@@ -67,7 +67,7 @@ Kesalahan frame sulit ditemukan karena query tetap berjalan tanpa error dan meng
 Jadi, data yang sering digunakan untuk pencarian, perhitungan, dan memiliki aturan tertentu lebih baik dipromosikan menjadi kolom relasional. Sementara itu, JSON tetap berguna untuk menyimpan informasi tambahan yang lebih fleksibel dan memungkinkan strukturnya berbeda-beda.
 
 ## Temuan Q14
-
+Berdasarkan hasil perbandingan, terdapat 34 tanggal yang memiliki hasil berbeda antara Q13 dan Q14. Perbedaan terlihat pada kolom rerata, sedangkan nilai kumulatif pada kedua query tetap sama. Hal ini terjadi karena Q13 menggunakan frame ROWS secara eksplisit untuk membatasi perhitungan sesuai frame yang ditentukan, sedangkan Q14 tidak menggunakan klausa frame sehingga menggunakan perilaku default RANGE. Akibatnya, cara PostgreSQL menentukan baris yang ikut dalam perhitungan rata-rata menjadi berbeda, sehingga seluruh 34 tanggal pada hasil perbandingan menunjukkan nilai rerata yang berbeda.
 
 ## Hasil R1
 ![Sepuluh baris pertama](r1_10_baris.png)
