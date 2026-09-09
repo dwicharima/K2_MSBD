@@ -27,6 +27,14 @@ Jika hasilnya > 0, kolom tersebut sangat rawan membuat NOT IN gagal total. Sebag
 
 Tapi, Pada mesin database, hal itu belum tentu dikerjakan seperti itu. Query Optimizer modern (PostgreSQL) mesin database sering melakukan subquery unnesting (mengubah subquerynya jadi operasi JOIN) atau caching hasil. Jadi, eksekusi aslinya bisa jauh lebih optimize dan nggak bener-bener ngeloop dari nol terus-terusan setiap baris.
 
+## Refleksi B - CTE dan Recursive CTE
+
+1. Pada Q7, mengapa recursive term hanya melihat baris yang baru dihasilkan pada iterasi sebelumnya, dan apa akibatnya jika ia melihat seluruh hasil?
+> Recursive CTE bekerja dengan "working table": tiap putaran hanya memproses baris baru dari putaran sebelumnya, bukan seluruh hasil yang terkumpul. Kalau ia memproses seluruh hasil, baris lama ikut diulang terus tiap putaran, sehingga jumlah baris membengkak (bisa eksponensial) dan pada data yang bersiklus query tidak akan pernah berhenti.
+
+2. Kapan mengganti UNION ALL dengan UNION dapat menghentikan siklus, dan mengapa itu tetap bukan solusi yang baik?
+> UNION hanya menghentikan siklus kalau baris yang berulang persis sama di semua kolom. Pada Q7, kolom level dan jalur selalu berubah tiap putaran, jadi baris tidak pernah benar-benar identik dan siklus tetap jalan terus — UNION tidak bisa diandalkan. Selain itu UNION lebih mahal karena harus membandingkan seluruh kolom setiap baris untuk deteksi duplikat, padahal solusi seperti array jalur (NOT (id = ANY(jalur_id))) langsung menyasar akar masalah (id yang berulang) dengan biaya lebih murah dan maksud yang lebih jelas.
+
 ##  Reflektif D
 1. Pada Q16, tanpa GROUPING(), bagaimana pembaca membedakan subtotal dari baris data yang kolomnya memang kosong?
 > Pada Q16, tanpa GROUPING(), pembaca sulit membedakan apakah nilai NULL pada kolom hasil grouping merupakan subtotal atau memang nilai kolom data yang kosong (NULL). GROUPING() digunakan untuk menandai apakah NULL tersebut berasal dari baris subtotal/rollup atau dari data asli.
