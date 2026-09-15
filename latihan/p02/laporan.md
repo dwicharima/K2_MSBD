@@ -12,7 +12,7 @@
 
 ### Nama domain dan alasan kelompok memilih domain tersebut.
 
-Nama Domain : Manajemen Kompetisi Antar-Mahasiswa. 
+Nama Domain : Manajemen Kompetisi Antar-Mahasiswa.
 Alasan kami memilih domain ini karena awalnya kami mencari beberapa referensi dari AI untuk mendapatkan beberapa kandidat domain yang bisa digunakan. Setelah melihat dan mempertimbangkan beberapa pilihan, kami akhirnya memilih Manajemen Kompetisi Antar-Mahasiswa.
 
 Kami memilih domain ini adalah karena manajemen kompetisi antar-mahasiswa merupakan kegiatan yang cukup sering dilakukan, baik dalam lingkup fakultas, universitas, maupun dengan pihak di luar kampus. Dalam pelaksanaannya, diperlukan pengelolaan data yang terstruktur agar proses pendaftaran peserta, pembentukan tim, penjadwalan pertandingan, hingga penilaian dapat berjalan dengan baik. Domain ini juga menarik karena memiliki beberapa aturan bisnis yang cukup kompleks, seperti batas jumlah anggota dalam tim, periode pendaftaran, bentroknya jadwal pertandingan, serta ketentuan bahwa hanya tim yang sudah terdaftar yang dapat mengikuti pertandingan. Oleh karena itu, kami merasa domain ini cocok untuk dipraktikkan dalam perancangan basis data.
