@@ -1,40 +1,60 @@
--- Diminta: membuat struktur harga_film dan trigger tulis ganda agar perubahan rental_rate pada lab4.film tercermin pada struktur harga baru.
--- Dipilih: AFTER UPDATE OF rental_rate dengan WHEN OLD.rental_rate IS DISTINCT FROM NEW.rental_rate karena hanya perubahan harga yang perlu disalin ke harga_film.
--- Alternatif: melakukan sinkronisasi secara manual setelah UPDATE; tidak dipilih karena mudah terlupa dan tidak menjamin data baru langsung mengikuti perubahan rental_rate.
+-- Diminta: Membuat fase expand dengan struktur baru dan trigger tulis ganda agar perubahan rental_rate pada bentuk lama tercermin pada bentuk baru.
+-- Dipilih: Membuat tabel harga_film dan trigger AFTER UPDATE OF rental_rate dengan WHEN IS DISTINCT FROM agar perubahan harga pada bentuk lama disinkronkan ke bentuk baru.
+-- Alternatif: Melakukan backfill dan membuat view pada tahap ini; tidak dipilih karena tugas menetapkan enam tahap expand–contract secara berurutan.
 
 SET search_path TO lab4, public;
 
--- Struktur baru
+-- =========================================================
+-- 1. BUAT STRUKTUR BARU
+-- =========================================================
+
 CREATE TABLE IF NOT EXISTS lab4.harga_film (
     harga_film_id bigserial PRIMARY KEY,
     film_id integer NOT NULL REFERENCES lab4.film (film_id),
     wilayah text NOT NULL,
     harga numeric(5,2) NOT NULL CHECK (harga >= 0),
     berlaku daterange NOT NULL,
-    EXCLUDE USING gist (
-        film_id WITH =,
-        wilayah WITH =,
-        berlaku WITH &&
-    )
+    CONSTRAINT exclude_harga_film
+        EXCLUDE USING gist (
+            film_id WITH =,
+            wilayah WITH =,
+            berlaku WITH &&
+        )
 );
 
--- Function untuk tulis ganda
+-- =========================================================
+-- 2. PASANG TULIS GANDA
+-- =========================================================
+
 CREATE OR REPLACE FUNCTION lab4.sync_rental_rate_to_harga_film()
 RETURNS trigger
 LANGUAGE plpgsql
 AS $$
 BEGIN
-    INSERT INTO lab4.harga_film
-        (film_id, wilayah, harga, berlaku)
-    VALUES
-        (NEW.film_id, 'default', NEW.rental_rate, daterange(CURRENT_DATE, NULL, '[)'));
+    UPDATE lab4.harga_film
+    SET harga = NEW.rental_rate
+    WHERE film_id = NEW.film_id
+      AND wilayah = 'ID'
+      AND upper_inf(berlaku);
+
+    IF NOT FOUND THEN
+        INSERT INTO lab4.harga_film
+            (film_id, wilayah, harga, berlaku)
+        VALUES
+            (
+                NEW.film_id,
+                'ID',
+                NEW.rental_rate,
+                daterange(CURRENT_DATE, NULL, '[)')
+            );
+    END IF;
 
     RETURN NEW;
 END;
 $$;
 
--- Trigger tulis ganda
-DROP TRIGGER IF EXISTS trg_sync_rental_rate ON lab4.film;
+DROP TRIGGER IF EXISTS trg_sync_rental_rate
+ON lab4.film;
 
 CREATE TRIGGER trg_sync_rental_rate
 AFTER UPDATE OF rental_rate ON lab4.film

@@ -1,29 +1,52 @@
--- Diminta: Hentikan tulis ganda, buat view fasad untuk kompatibilitas aplikasi lama, dan drop kolom lama.
--- Dipilih: Mengubah tabel utama menjadi film_base dan membungkus View lab4.film agar pembaca lama tidak error.
--- Alternatif: Drop kolom langsung tanpa view fasad; tidak dipilih karena langsung merusak query aplikasi lama.
+-- Diminta: Menghentikan tulis ganda, membuat view fasad untuk mempertahankan akses pembaca lama, lalu menghapus kolom rental_rate dari tabel dasar.
+-- Dipilih: Menghentikan trigger, mengganti nama tabel dasar menjadi film_base, membuat view lab4.film dengan rental_rate dari harga_film, lalu menghapus kolom lama setelah view tersedia.
+-- Alternatif: Menghapus kolom rental_rate secara langsung; tidak dipilih karena akan menyebabkan pembaca lama gagal sebelum view fasad tersedia.
 
--- 1. Hentikan Trigger Tulis Ganda
-DROP TRIGGER IF EXISTS trg_tulis_ganda_harga ON lab4.film;
+SET search_path TO lab4, public;
 
--- 2. Rename Tabel Dasar (Jalankan jika belum)
--- ALTER TABLE lab4.film RENAME TO film_base;
+-- =========================================================
+-- 1. HENTIKAN TULIS GANDA
+-- =========================================================
 
--- 3. Buat View Fasad Kompatibilitas (Hanya kolom yang benar-benar ada di film_base)
+DROP TRIGGER IF EXISTS trg_sync_rental_rate
+ON lab4.film;
+
+-- =========================================================
+-- 2. RENAME TABEL DASAR
+-- =========================================================
+
+ALTER TABLE lab4.film
+RENAME TO film_base;
+
+-- =========================================================
+-- 3. BUAT VIEW FASAD
+-- =========================================================
+
 CREATE OR REPLACE VIEW lab4.film AS
-SELECT 
+SELECT
     f.film_id,
     f.title,
     f.description,
     f.release_year,
     f.language_id,
+    f.original_language_id,
     f.rental_duration,
     h.harga AS rental_rate,
     f.length,
     f.replacement_cost,
     f.rating,
-    f.last_update
+    f.last_update,
+    f.special_features,
+    f.fulltext,
+    f.deleted_at
 FROM lab4.film_base f
-LEFT JOIN lab4.harga_film h ON h.film_id = f.film_id AND h.wilayah = 'ID';
+LEFT JOIN lab4.harga_film h
+    ON h.film_id = f.film_id
+   AND h.wilayah = 'ID';
 
--- 4. Drop Kolom Lama dari Tabel Dasar dengan CASCADE
-ALTER TABLE lab4.film_base DROP COLUMN IF EXISTS rental_rate CASCADE;
+-- =========================================================
+-- 4. DROP KOLOM LAMA
+-- =========================================================
+
+ALTER TABLE lab4.film_base
+DROP COLUMN rental_rate;

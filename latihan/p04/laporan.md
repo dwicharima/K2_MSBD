@@ -806,8 +806,128 @@ Alasan:
 Perintah INSERT menghasilkan INSERT 0 5 karena hanya terdapat 5 film yang belum memiliki data harga untuk wilayah ID. Setelah kelima baris tersebut berhasil dimasukkan, query verifikasi menghasilkan sisa_belum_terisi = 0, yang menunjukkan bahwa seluruh film yang diperiksa telah memiliki data harga wilayah ID. Kondisi NOT EXISTS mencegah pemasukan data yang sudah tersedia sehingga backfill dapat dijalankan tanpa membuat duplikasi berdasarkan film dan wilayah.
 
 ### Q20
-### Q21
+**Perintah:**
 
+```sql
+DROP TRIGGER IF EXISTS trg_sync_rental_rate
+ON lab4.film;
+
+ALTER TABLE lab4.film
+RENAME TO film_base;
+
+CREATE OR REPLACE VIEW lab4.film AS
+SELECT
+    f.film_id,
+    f.title,
+    f.description,
+    f.release_year,
+    f.language_id,
+    f.original_language_id,
+    f.rental_duration,
+    h.harga AS rental_rate,
+    f.length,
+    f.replacement_cost,
+    f.rating,
+    f.last_update,
+    f.special_features,
+    f.fulltext,
+    f.deleted_at
+FROM lab4.film_base f
+LEFT JOIN lab4.harga_film h
+    ON h.film_id = f.film_id
+   AND h.wilayah = 'ID';
+
+ALTER TABLE lab4.film_base
+DROP COLUMN rental_rate;
+```
+
+**Keluaran:**
+
+```text
+DROP TRIGGER
+ALTER TABLE
+CREATE VIEW
+ALTER TABLE
+```
+
+**Pengujian pembaca lama:**
+
+Sebelum fase contract, sesi pembaca menjalankan:
+
+```sql
+SELECT title, rental_rate
+FROM lab4.film
+LIMIT 5;
+```
+
+Query tersebut dapat membaca kolom `rental_rate` dari tabel lama.
+
+Pada saat proses rename dan sebelum view fasad tersedia, terdapat kemungkinan pembaca lama mengalami kegagalan karena objek `lab4.film` sedang berubah. Setelah view fasad dibuat, query lama kembali dapat dijalankan karena `lab4.film` sekarang merupakan view yang menyediakan kolom `rental_rate` melalui `harga_film.harga`.
+
+Setelah `rental_rate` dihapus dari `lab4.film_base`, pembaca lama tetap menggunakan:
+
+```sql
+SELECT title, rental_rate
+FROM lab4.film
+LIMIT 5;
+```
+
+dan kolom `rental_rate` tetap tersedia melalui view fasad.
+
+**Alasan:**
+
+Tahap contract tidak langsung menghapus kolom lama sebelum tersedia pengganti yang kompatibel. Tabel dasar terlebih dahulu diubah menjadi `film_base`, kemudian dibuat view `lab4.film` dengan bentuk kolom yang masih dikenali aplikasi lama. Dengan demikian, `rental_rate` yang sebelumnya berasal dari `film.rental_rate` sekarang berasal dari `harga_film.harga`, sementara nama kolom yang digunakan pembaca lama tetap dipertahankan.
+
+Trigger tulis ganda dihentikan karena setelah fase backfill dan pembuatan view fasad, bentuk lama tidak lagi menjadi sumber penulisan harga.
+
+---
+
+### Q21
+Enam tahap Expand–Contract direpresentasikan sebagai enam migration berversi:
+
+```text
+0041_expand_buat_harga_film
+0042_expand_trigger_tulis_ganda
+0043_migrate_backfill
+0044_migrate_verifikasi
+0045_contract_view_fasad
+0046_contract_drop_kolom_lama
+```
+
+Setiap migration memiliki pasangan `.up.sql` dan `.down.sql`.
+
+Urutan migrasi:
+
+1. **0041** — membuat tabel `harga_film` sebagai struktur baru.
+2. **0042** — memasang trigger tulis ganda dari `film.rental_rate` ke `harga_film`.
+3. **0043** — melakukan backfill data lama ke `harga_film` dalam batch 1000.
+4. **0044** — melakukan verifikasi bahwa seluruh film telah memiliki data harga baru. Target hasil adalah `0`.
+5. **0045** — menghentikan tulis ganda dan membuat view fasad `lab4.film`.
+6. **0046** — menghapus kolom `rental_rate` dari tabel dasar `film_base`.
+
+Struktur migration:
+
+```text
+migrations/
+├── 0041_expand_buat_harga_film.up.sql
+├── 0041_expand_buat_harga_film.down.sql
+├── 0042_expand_trigger_tulis_ganda.up.sql
+├── 0042_expand_trigger_tulis_ganda.down.sql
+├── 0043_migrate_backfill.up.sql
+├── 0043_migrate_backfill.down.sql
+├── 0044_migrate_verifikasi.up.sql
+├── 0044_migrate_verifikasi.down.sql
+├── 0045_contract_view_fasad.up.sql
+├── 0045_contract_view_fasad.down.sql
+├── 0046_contract_drop_kolom_lama.up.sql
+└── 0046_contract_drop_kolom_lama.down.sql
+```
+
+**Catatan rollback:**
+
+Migration `0041` sampai `0045` relatif dapat dikembalikan sesuai objek yang dibuat atau diubah. Namun `0046` bersifat destruktif. File `0046.down.sql` hanya dapat membuat kembali struktur kolom `rental_rate`; file tersebut tidak dapat mengembalikan nilai historis `rental_rate` yang telah dihapus.
+
+Oleh karena itu, `0046` tidak boleh dijalankan sebelum hasil verifikasi Q19 bernilai `0`, view fasad terbukti dapat digunakan oleh pembaca lama, dan bukti bahwa aplikasi sudah tidak bergantung langsung pada kolom lama telah dikumpulkan.
 
 
 ## Refleksi A–E

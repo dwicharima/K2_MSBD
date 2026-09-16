@@ -25,7 +25,7 @@ CREATE TABLE lab4.harga_film (
 INSERT INTO lab4.harga_film
     (film_id, wilayah, harga, berlaku)
 VALUES
-    (1, 'Indonesia', 50.00, '[2026-01-01,2026-04-01)');
+    (1, 'ID', 50.00, '[2026-01-01,2026-04-01)');
 
 -- Melihat data
 SELECT * FROM lab4.harga_film;
@@ -34,4 +34,4 @@ SELECT * FROM lab4.harga_film;
 INSERT INTO lab4.harga_film
     (film_id, wilayah, harga, berlaku)
 VALUES
-    (1, 'Indonesia', 60.00, '[2026-03-01,2026-06-01)');
+    (1, 'ID', 60.00, '[2026-03-01,2026-06-01)');
