@@ -140,6 +140,229 @@ Alasan :
 View yang mengandung fungsi agregat (count, avg) dan klausul pengelompokan (GROUP BY) bersifat not auto-updatable. PostgreSQL tidak memiliki mekanisme otomatis untuk memetakan kembali nilai agregat ke baris-baris data individual di dalam tabel dasar fisik, sehingga operasi INSERT ditolak kecuali jika dipasangkan dengan trigger khusus INSTEAD OF.
 
 
+### Q5
+-- Diminta: menjalankan query agregasi akses berdasarkan bulan dan kanal,
+-- serta mencatat waktu eksekusinya.
+
+-- Dipilih: date_trunc untuk mengelompokkan waktu menjadi bulan, COUNT(*)
+-- untuk menghitung seluruh akses, dan COUNT(DISTINCT film_id) untuk
+-- menghitung jumlah film unik pada setiap kombinasi bulan dan kanal.
+
+-- Alternatif: GROUP BY EXTRACT(YEAR FROM waktu), EXTRACT(MONTH FROM waktu);
+-- tidak dipilih karena date_trunc menghasilkan nilai periode bulan secara
+-- langsung dan lebih sederhana digunakan sebagai satu kolom pengelompokan.
+
+\timing on
+
+SELECT date_trunc('month', a.waktu) AS bulan,
+       a.kanal,
+       count(*) AS jumlah_akses,
+       count(DISTINCT a.film_id) AS film_unik
+FROM lab4.jejak_akses a
+GROUP BY 1, 2
+ORDER BY 1, 2;
+
+Keluaran:
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
+$ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q05_query_dasar_akses.sql
+Timing is on.
+         bulan          |  kanal  | jumlah_akses | film_unik 
+------------------------+---------+--------------+-----------
+ 2025-09-01 00:00:00+00 | android |         6914 |       999
+ 2025-09-01 00:00:00+00 | ios     |         6691 |      1000
+ 2025-09-01 00:00:00+00 | kiosk   |         3447 |       967
+ 2025-09-01 00:00:00+00 | web     |         3320 |       968
+ 2025-10-01 00:00:00+00 | android |        14143 |      1000
+ 2025-10-01 00:00:00+00 | ios     |        14158 |      1000
+ 2025-10-01 00:00:00+00 | kiosk   |         7106 |       999
+ 2025-10-01 00:00:00+00 | web     |         7126 |      1000
+ 2025-11-01 00:00:00+00 | android |        13782 |      1000
+ 2025-11-01 00:00:00+00 | ios     |        13786 |      1000
+ 2025-11-01 00:00:00+00 | kiosk   |         6959 |      1000
+ 2025-11-01 00:00:00+00 | web     |         6779 |       996
+ 2025-12-01 00:00:00+00 | android |        14298 |      1000
+ 2025-12-01 00:00:00+00 | ios     |        14212 |      1000
+ 2025-12-01 00:00:00+00 | kiosk   |         7121 |      1000
+ 2025-12-01 00:00:00+00 | web     |         7105 |      1000
+ 2026-01-01 00:00:00+00 | android |        13846 |      1000
+ 2026-01-01 00:00:00+00 | ios     |        14175 |      1000
+ 2026-01-01 00:00:00+00 | kiosk   |         6948 |      1000
+ 2026-01-01 00:00:00+00 | web     |         7152 |      1000
+ 2026-02-01 00:00:00+00 | android |        12819 |      1000
+ 2026-02-01 00:00:00+00 | ios     |        12497 |      1000
+ 2026-02-01 00:00:00+00 | kiosk   |         6474 |      1000
+ 2026-02-01 00:00:00+00 | web     |         6291 |      1000
+ 2026-03-01 00:00:00+00 | android |        14148 |      1000
+ 2026-03-01 00:00:00+00 | ios     |        14124 |      1000
+ 2026-03-01 00:00:00+00 | kiosk   |         7162 |       999
+ 2026-03-01 00:00:00+00 | web     |         7030 |      1000
+ 2026-04-01 00:00:00+00 | android |        13789 |      1000
+ 2026-04-01 00:00:00+00 | ios     |        13485 |      1000
+ 2026-04-01 00:00:00+00 | kiosk   |         6690 |       999
+ 2026-04-01 00:00:00+00 | web     |         6958 |      1000
+ 2026-05-01 00:00:00+00 | android |        14247 |      1000
+ 2026-05-01 00:00:00+00 | ios     |        14164 |      1000
+ 2026-05-01 00:00:00+00 | kiosk   |         7009 |       999
+ 2026-05-01 00:00:00+00 | web     |         7064 |       999
+ 2026-06-01 00:00:00+00 | android |        13677 |      1000
+ 2026-06-01 00:00:00+00 | ios     |        13665 |      1000
+ 2026-06-01 00:00:00+00 | kiosk   |         6895 |       999
+ 2026-06-01 00:00:00+00 | web     |         6880 |       996
+ 2026-07-01 00:00:00+00 | android |        14275 |      1000
+ 2026-07-01 00:00:00+00 | ios     |        14033 |      1000
+ 2026-07-01 00:00:00+00 | kiosk   |         7132 |       999
+ 2026-07-01 00:00:00+00 | web     |         7228 |       999
+ 2026-08-01 00:00:00+00 | android |        14214 |      1000
+ 2026-08-01 00:00:00+00 | ios     |        14140 |      1000
+ 2026-08-01 00:00:00+00 | kiosk   |         7083 |      1000
+ 2026-08-01 00:00:00+00 | web     |         7123 |      1000
+ 2026-09-01 00:00:00+00 | android |         6819 |       999
+ 2026-09-01 00:00:00+00 | ios     |         6961 |       999
+ 2026-09-01 00:00:00+00 | kiosk   |         3442 |       967
+ 2026-09-01 00:00:00+00 | web     |         3414 |       969
+(52 rows)
+
+Time: 618.533 ms
+
+Alasan:
+Hasil Q5 menghasilkan 52 baris karena data akses tersebar pada 13 bulan kalender dan terdapat 4 kanal akses, sehingga terbentuk 13 × 4 = 52 kombinasi kelompok. Jumlah akses pada setiap kelompok berbeda karena data waktu dan kanal dibuat menggunakan nilai acak. Nilai film_unik hampir selalu mendekati 1.000 karena film_id dihasilkan secara acak pada rentang 1 sampai 1.000 dan jumlah transaksi pada setiap kelompok cukup besar sehingga hampir seluruh film muncul. Jumlah akses pada September 2025 dan September 2026 lebih sedikit karena kedua bulan tersebut hanya terwakili sebagian dalam rentang 365 hari saat data dibuat. Query membutuhkan waktu 618,533 ms pada lingkungan PostgreSQL yang digunakan.
+
+
+### Q6
+-- Diminta: menjadikan query Q5 sebagai materialized view dengan WITH NO DATA,
+-- membuktikan bahwa matview belum dapat dibaca sebelum refresh, kemudian
+-- melakukan refresh biasa dan mencatat waktunya.
+
+-- Dipilih: CREATE MATERIALIZED VIEW ... WITH NO DATA agar materialized view
+-- dibuat terlebih dahulu tanpa mengisi hasil query, kemudian REFRESH MATERIALIZED
+-- VIEW digunakan untuk mengisi hasil agregasinya.
+
+-- Alternatif: CREATE MATERIALIZED VIEW tanpa WITH NO DATA; tidak dipilih karena
+-- soal secara khusus meminta kondisi awal matview kosong sebelum dilakukan refresh.
+
+\timing on
+
+CREATE MATERIALIZED VIEW lab4.ringkasan_akses AS
+SELECT date_trunc('month', a.waktu) AS bulan,
+       a.kanal,
+       count(*) AS jumlah_akses,
+       count(DISTINCT a.film_id) AS film_unik
+FROM lab4.jejak_akses a
+GROUP BY 1, 2
+ORDER BY 1, 2
+WITH NO DATA;
+
+-- Coba membaca materialized view sebelum refresh.
+SELECT *
+FROM lab4.ringkasan_akses;
+
+-- Isi materialized view dengan hasil query.
+REFRESH MATERIALIZED VIEW lab4.ringkasan_akses;
+
+Keluaran:
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
+$ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q06_buat_matview.sql
+Timing is on.
+CREATE MATERIALIZED VIEW
+Time: 6.504 ms
+Time: 0.398 ms
+psql:/proc/self/fd/0:26: ERROR:  materialized view "ringkasan_akses" has not been populated
+HINT:  Use the REFRESH MATERIALIZED VIEW command.
+REFRESH MATERIALIZED VIEW
+Time: 646.175 ms
+
+Alasan:
+Materialized view lab4.ringkasan_akses berhasil dibuat menggunakan WITH NO DATA. Ketika materialized view tersebut dibaca sebelum dilakukan refresh, PostgreSQL menghasilkan error materialized view "ringkasan_akses" has not been populated. Setelah itu, REFRESH MATERIALIZED VIEW berhasil dijalankan dengan waktu 646.175 ms.
+
+
+### Q7
+-- Diminta: mencoba refresh materialized view secara concurrent, mencatat
+-- pesan galat, membuat unique index yang mencakup seluruh baris matview,
+-- kemudian mengulangi refresh concurrent dan mencatat waktunya.
+
+-- Dipilih: unique index pada (bulan, kanal) karena kombinasi tersebut
+-- mengidentifikasi setiap baris hasil GROUP BY pada materialized view.
+-- REFRESH CONCURRENTLY dipilih untuk memungkinkan pembaca tetap mengakses
+-- materialized view selama proses refresh.
+
+-- Alternatif: menggunakan REFRESH MATERIALIZED VIEW biasa saja; tidak dipilih
+-- karena refresh biasa dapat memblokir pembaca dan tidak menguji tujuan
+-- utama penggunaan CONCURRENTLY.
+
+\timing on
+
+-- Percobaan pertama: seharusnya gagal karena belum ada unique index.
+REFRESH MATERIALIZED VIEW CONCURRENTLY lab4.ringkasan_akses;
+
+-- Membuat unique index untuk memenuhi syarat refresh concurrent.
+CREATE UNIQUE INDEX ringkasan_akses_bulan_kanal_uidx
+ON lab4.ringkasan_akses (bulan, kanal);
+
+-- Percobaan kedua: refresh concurrent setelah unique index dibuat.
+REFRESH MATERIALIZED VIEW CONCURRENTLY lab4.ringkasan_akses;
+
+Keluaran:
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
+$ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q07_refresh_concurrently.sql
+Timing is on.
+psql:/proc/self/fd/0:17: ERROR:  cannot refresh materialized view "lab4.ringkasan_akses" concurrently
+HINT:  Create a unique index with no WHERE clause on one or more columns of the materialized view.
+Time: 1.170 ms
+CREATE INDEX
+Time: 4.578 ms
+REFRESH MATERIALIZED VIEW
+Time: 609.347 ms
+
+Alasan:
+Percobaan menunjukkan bahwa REFRESH MATERIALIZED VIEW CONCURRENTLY memiliki persyaratan berupa unique index tanpa klausa WHERE pada materialized view. Percobaan pertama gagal dengan waktu 1.170 ms karena ringkasan_akses belum memiliki unique index. Setelah unique index pada (bulan, kanal) dibuat dengan waktu 4.578 ms, percobaan kedua berhasil melakukan refresh concurrent dengan waktu 609.347 ms. Dengan demikian, unique index diperlukan agar PostgreSQL dapat melakukan pembaruan materialized view secara concurrent.
+
+
+### Q8
+-- Diminta: membuktikan bahwa REFRESH MATERIALIZED VIEW CONCURRENTLY tidak
+-- memblokir pembaca, kemudian membandingkannya dengan refresh biasa.
+
+-- Dipilih: dua sesi PostgreSQL digunakan agar SELECT pada sesi 2 dapat
+-- dijalankan ketika refresh pada sesi 1 sedang berlangsung. Perbandingan
+-- dilakukan antara REFRESH CONCURRENTLY dan REFRESH biasa untuk melihat
+-- perbedaan perilaku lock terhadap pembaca.
+
+-- Alternatif: menjalankan refresh dan SELECT secara berurutan dalam satu sesi;
+-- tidak dipilih karena tidak dapat membuktikan apakah pembaca terblokir selama
+-- proses refresh berlangsung.
+
+-- ============================================================
+-- SESI 1
+-- ============================================================
+
+INSERT INTO lab4.jejak_akses (film_id, waktu, kanal)
+SELECT (random() * 999)::int + 1,
+       now(),
+       'web'
+FROM generate_series(1, 200000);
+
+-- Refresh concurrent.
+REFRESH MATERIALIZED VIEW CONCURRENTLY lab4.ringkasan_akses;
+
+
+-- ============================================================
+-- SESI 2
+-- Jalankan segera setelah refresh pada sesi 1 dimulai.
+-- ============================================================
+
+SELECT count(*)
+FROM lab4.ringkasan_akses;
+
+Keluaran:
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
+$ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q08_buktikan_pembaca.sql
+INSERT 0 200000
+REFRESH MATERIALIZED VIEW
+ count 
+-------
+    52
+(1 row)
+
+
 
 ## Refleksi A–E
 
@@ -157,3 +380,10 @@ Dua Kerugian
 
 Keadaan Konkret yang Mempersulit
 Pendekatan ini justru mempersulit tim saat aplikasi melakukan debugging atau bulk insert data historis yang bervariasi nilainya. Misalnya, ketika tim melakukan migrasi data massal atau form input admin memasukkan produk dengan harga khusus di luar batas standar view tanpa menyadari adanya batasan CHECK OPTION, aplikasi akan mendadak crash atau memunculkan galat violation check option yang membingungkan karena mereka mengira data dimasukkan ke tabel yang benar, padahal terbentur aturan fasad view.
+
+Pertanyaan Reflektif B
+Materialized view memberikan waktu baca yang cepat karena hasil agregasi sudah disimpan secara fisik. Namun, data di dalamnya tidak otomatis berubah ketika tabel sumber berubah. Semakin lama interval refresh, semakin besar kemungkinan laporan menampilkan data yang sudah tidak mutakhir. Sebaliknya, semakin sering materialized view di-refresh, semakin besar beban komputasi yang diberikan kepada database. REFRESH CONCURRENTLY mengurangi gangguan terhadap pembaca, tetapi membutuhkan unique index dan umumnya memiliki pekerjaan tambahan dibandingkan refresh biasa.
+
+Sebagai kompromi konkret, laporan keuangan dapat menetapkan batas kebasian maksimal 15 menit. Materialized view dijadwalkan melakukan refresh setiap 10 menit, sehingga dalam kondisi normal data yang ditampilkan tidak lebih tua dari batas yang ditentukan. Penggunaan REFRESH MATERIALIZED VIEW CONCURRENTLY memungkinkan laporan tetap dapat dibaca ketika proses refresh berlangsung, sehingga kecepatan akses dan ketersediaan laporan tetap terjaga.
+
+Apabila refresh gagal di tengah proses, sistem sebaiknya tidak menghapus atau mengganti hasil refresh terakhir yang berhasil. Versi materialized view terakhir tetap digunakan sebagai data laporan, sementara kegagalan dicatat dalam log dan administrator diberi peringatan. Sistem kemudian dapat melakukan retry terbatas atau mencoba kembali pada jadwal refresh berikutnya. Dengan cara ini, kegagalan refresh tidak langsung membuat laporan menjadi tidak tersedia.
