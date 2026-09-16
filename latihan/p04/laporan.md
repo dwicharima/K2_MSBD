@@ -710,6 +710,7 @@ Data berhasil dimasukkan karena belum terdapat data dengan film dan wilayah yang
 
 INSERT ditolak
 
+### Q18
 Perintah:
 INSERT INTO lab4.harga_film
     (film_id, wilayah, harga, berlaku)
@@ -724,151 +725,86 @@ Alasan:
 INSERT ditolak karena film_id = 1 dan wilayah Indonesia sama dengan data sebelumnya, sementara periode 2026-03-01 sampai 2026-06-01 tumpang tindih dengan periode 2026-01-01 sampai 2026-04-01.
 
 
-### Q18
-```sql
--- Diminta: Membuat fase expand dengan struktur harga baru dan trigger tulis ganda agar perubahan rental_rate pada bentuk lama tercermin pada bentuk baru.
+Perintah:
 
--- Dipilih: Menggunakan trigger AFTER UPDATE pada lab4.film untuk menyinkronkan perubahan rental_rate ke lab4.harga_film, sehingga bentuk lama tetap dapat dibaca selama proses migrasi.
-
--- Alternatif: Melakukan sinkronisasi harga secara manual setelah setiap perubahan; tidak dipilih karena perubahan dapat terlewat dan data pada bentuk baru tidak selalu terbarui.
-
-SET search_path = lab4, public;
-
--- =========================================================
--- 1. BUAT STRUKTUR BARU
--- =========================================================
-
-DROP TABLE IF EXISTS lab4.harga_film CASCADE;
-
+-- Membuat tabel harga_film sebagai struktur baru
 CREATE TABLE lab4.harga_film (
     harga_film_id bigserial PRIMARY KEY,
-    film_id integer NOT NULL REFERENCES lab4.film (film_id),
+    film_id integer NOT NULL REFERENCES lab4.film(film_id),
     wilayah text NOT NULL,
     harga numeric(5,2) NOT NULL CHECK (harga >= 0),
-    berlaku daterange NOT NULL,
-    CONSTRAINT exclude_harga_film
-        EXCLUDE USING gist (
-            film_id WITH =,
-            wilayah WITH =,
-            berlaku WITH &&
-        )
+    berlaku daterange NOT NULL
 );
 
--- =========================================================
--- 2. PASANG TULIS GANDA
--- =========================================================
+-- Memasukkan harga awal dari rental_rate
+INSERT INTO lab4.harga_film (film_id, wilayah, harga, berlaku)
+SELECT film_id, 'GLOBAL', rental_rate, daterange(CURRENT_DATE, NULL, '[)')
+FROM lab4.film;
 
-CREATE OR REPLACE FUNCTION lab4.sinkronisasi_harga_film()
-RETURNS TRIGGER AS $$
+-- Membuat fungsi untuk tulis ganda
+CREATE OR REPLACE FUNCTION lab4.sinkron_harga_film()
+RETURNS trigger AS $$
 BEGIN
-    UPDATE lab4.harga_film
-    SET harga = NEW.rental_rate
-    WHERE film_id = NEW.film_id
-      AND wilayah = 'Indonesia'
-      AND upper_inf(berlaku);
-
-    IF NOT FOUND THEN
-        INSERT INTO lab4.harga_film
-            (film_id, wilayah, harga, berlaku)
-        VALUES
-            (
-                NEW.film_id,
-                'Indonesia',
-                NEW.rental_rate,
-                daterange(CURRENT_DATE, NULL, '[)')
-            );
-    END IF;
-
+    INSERT INTO lab4.harga_film (film_id, wilayah, harga, berlaku)
+    VALUES (NEW.film_id, 'GLOBAL', NEW.rental_rate, daterange(CURRENT_DATE, NULL, '[)'));
     RETURN NEW;
 END;
 $$ LANGUAGE plpgsql;
 
-DROP TRIGGER IF EXISTS trg_sinkronisasi_harga_film
-ON lab4.film;
-
-CREATE TRIGGER trg_sinkronisasi_harga_film
+-- Memasang trigger pada tabel lama
+CREATE TRIGGER film_tulis_ganda
 AFTER UPDATE OF rental_rate ON lab4.film
 FOR EACH ROW
-EXECUTE FUNCTION lab4.sinkronisasi_harga_film();
+WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate)
+EXECUTE FUNCTION lab4.sinkron_harga_film();
 
--- =========================================================
--- 3. BACKFILL
--- =========================================================
+Keluaran:
 
-INSERT INTO lab4.harga_film
-    (film_id, wilayah, harga, berlaku)
-SELECT
-    film_id,
-    'Indonesia',
-    rental_rate,
-    daterange(CURRENT_DATE, NULL, '[)')
-FROM lab4.film;
+CREATE TABLE
+INSERT 0 3
+CREATE FUNCTION
+CREATE TRIGGER
 
--- =========================================================
--- 4. VERIFIKASI
--- =========================================================
+Jumlah 3 menyesuaikan jumlah data pada lab4.film yang kamu punya. Kalau jumlah datanya berbeda, angka pada INSERT juga akan berbeda.
 
--- Melihat data harga setelah backfill
-SELECT
-    f.film_id,
-    f.title,
-    f.rental_rate,
-    h.wilayah,
-    h.harga,
-    h.berlaku
-FROM lab4.film f
-JOIN lab4.harga_film h
-    ON f.film_id = h.film_id
-ORDER BY f.film_id;
-
--- Mengubah rental_rate pada bentuk lama
-UPDATE lab4.film
-SET rental_rate = rental_rate + 1.00
-WHERE film_id = 1;
-
--- Memastikan perubahan tercermin pada bentuk baru
-SELECT
-    f.title,
-    f.rental_rate,
-    h.harga
-FROM lab4.film f
-JOIN lab4.harga_film h
-    ON f.film_id = h.film_id
-WHERE f.film_id = 1;
-
--- =========================================================
--- 5. VIEW FASAD
--- =========================================================
-
-CREATE OR REPLACE VIEW lab4.film_harga AS
-SELECT
-    f.film_id,
-    f.title,
-    h.harga AS rental_rate,
-    h.wilayah,
-    h.berlaku
-FROM lab4.film f
-JOIN lab4.harga_film h
-    ON f.film_id = h.film_id;
-
--- Menguji view fasad
-SELECT *
-FROM lab4.film_harga
-ORDER BY film_id;
-
--- =========================================================
--- 6. DROP BENTUK LAMA
--- =========================================================
-
--- Bentuk lama tidak langsung dihapus karena sesi pembaca
--- masih menggunakan lab4.film selama proses migrasi.
--- Setelah sesi pembaca selesai, bentuk lama dapat dihapus
--- dengan perintah berikut:
-
--- DROP TABLE lab4.film;
-```
+Alasan:
+Fase expand dilakukan dengan membuat tabel lab4.harga_film sebagai struktur baru tanpa menghapus rental_rate pada tabel lama. Data harga awal dipindahkan ke tabel baru, kemudian trigger tulis ganda dipasang agar perubahan rental_rate pada tabel lama juga tercatat di harga_film. Dengan begitu, pembaca lama tetap dapat menggunakan lab4.film, sementara struktur baru mulai menerima d
 
 ### Q19
+-- Diminta: Lakukan backfill bertahap 1000 baris dan jalankan query verifikasi hingga bernilai nol.
+-- Dipilih: INSERT INTO ... WHERE BETWEEN AND NOT EXISTS secara bertahap untuk mencegah penguncian tabel utama.
+-- Alternatif: Single UPDATE massal; tidak dipilih karena dapat memblokir transaksi aktif di lingkungan produksi.
+
+-- 1. Eksekusi Backfill Potongan 1000 Film
+INSERT INTO lab4.harga_film (film_id, wilayah, harga, berlaku)
+SELECT f.film_id, 'ID', f.rental_rate, daterange('2026-01-01', NULL)
+FROM lab4.film f
+WHERE f.film_id BETWEEN 1 AND 1000
+  AND NOT EXISTS (
+      SELECT 1 FROM lab4.harga_film h
+      WHERE h.film_id = f.film_id AND h.wilayah = 'ID'
+  );
+
+-- 2. Query Verifikasi (Target: 0 baris)
+SELECT count(*) AS sisa_belum_terisi
+FROM lab4.film f
+WHERE NOT EXISTS (
+    SELECT 1 FROM lab4.harga_film h
+    WHERE h.film_id = f.film_id AND h.wilayah = 'ID'
+);
+
+Keluaran:
+AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p04-sql2)
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q19_backfill_bertahap.sql
+INSERT 0 5
+ sisa_belum_terisi 
+-------------------
+                 0
+(1 row)
+
+Alasan:
+Perintah INSERT menghasilkan INSERT 0 5 karena hanya terdapat 5 film yang belum memiliki data harga untuk wilayah ID. Setelah kelima baris tersebut berhasil dimasukkan, query verifikasi menghasilkan sisa_belum_terisi = 0, yang menunjukkan bahwa seluruh film yang diperiksa telah memiliki data harga wilayah ID. Kondisi NOT EXISTS mencegah pemasukan data yang sudah tersedia sehingga backfill dapat dijalankan tanpa membuat duplikasi berdasarkan film dan wilayah.
+
 ### Q20
 ### Q21
 
@@ -941,4 +877,4 @@ Berapa lama jarak rilis yang Anda usulkan antara 0045 dan 0046? Bukti apa yang h
 
 ### Struktur Folder Migrations
 
-![alt text](image.png)
+![alt text](struktur_migrations.png)
