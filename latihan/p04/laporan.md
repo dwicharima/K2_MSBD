@@ -363,13 +363,192 @@ REFRESH MATERIALIZED VIEW
 (1 row)
 
 ### Q9
-### Q10
-### Q11
-### Q12
-### Q13
-### Q14
-### Q15
+Perintah :
+CREATE OR REPLACE FUNCTION lab4.catat_audit_harga()
+RETURNS trigger AS $$
+BEGIN
+    INSERT INTO lab4.audit_harga (film_id, harga_lama, harga_baru, diubah_oleh, diubah_pada)
+    VALUES (OLD.film_id, OLD.rental_rate, NEW.rental_rate, current_user, now());
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
 
+CREATE TRIGGER film_audit_harga
+AFTER UPDATE OF rental_rate ON lab4.film
+FOR EACH ROW
+WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate)
+EXECUTE FUNCTION lab4.catat_audit_harga();
+
+Keluaran : 
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q09_trigger_audit_baris.sql 
+CREATE TABLE 
+CREATE FUNCTION 
+CREATE TRIGGER
+
+Alasan : Perintah ini membangun mekanisme audit trail sederhana. Tabel lab4.audit_harga dibuat untuk menyimpan riwayat perubahan harga, kemudian fungsi lab4.catat_audit_harga() didefinisikan untuk menyisipkan satu baris audit berisi harga lama, harga baru, pelaku, dan waktu perubahan. Trigger film_audit_harga dipasang sebagai AFTER UPDATE OF rental_rate FOR EACH ROW, artinya trigger hanya diperhatikan ketika kolom rental_rate ikut disebut pada klausa SET, dan ditambah klausa WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate) agar baris audit hanya benar-benar dicatat jika nilainya sungguh berubah, bukan sekadar ditulis ulang dengan nilai yang sama.
+
+
+### Q10
+Perintah :
+
+-- 1. Ubah harga sungguhan -> harus tercatat UPDATE lab4.film SET rental_rate = 2.99 WHERE title = 'Film A';
+
+-- 2. Tulis ulang harga sama persis -> TIDAK tercatat (ditahan WHEN) UPDATE lab4.film SET rental_rate = 2.99 WHERE title = 'Film A';
+
+-- 3. Ubah title saja -> TIDAK tercatat (trigger tidak fire sama sekali, -- karena rental_rate tidak disebut di SET) UPDATE lab4.film SET title = 'Film A Updated' WHERE title = 'Film A';
+
+SELECT * FROM lab4.audit_harga;
+
+Keluaran : 
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q10_uji_audit_baris.sql 
+UPDATE 1 
+UPDATE 1 
+UPDATE 1 
+audit_id | film_id | harga_lama | harga_baru | diubah_oleh | diubah_pada 
+---------+---------+------------+------------+-------------+------------------------------- 
+1        | 1       | 0.99       | 2.99       | msbd        | 2026-09-15 16:21:25.741917+00 (1 row)
+
+Alasan : Ketiga perintah UPDATE sama-sama berhasil mengenai satu baris (UPDATE 1), tetapi tabel audit_harga hanya berisi satu baris riwayat. UPDATE pertama benar-benar mengubah rental_rate dari 0.99 menjadi 2.99 sehingga klausa WHEN bernilai true dan trigger tercatat. UPDATE kedua menuliskan nilai 2.99 yang sama persis dengan nilai sebelumnya, sehingga OLD.rental_rate IS DISTINCT FROM NEW.rental_rate bernilai false dan trigger ditahan (tidak fire). UPDATE ketiga hanya mengubah kolom title, sama sekali tidak menyebut rental_rate pada SET, sehingga trigger AFTER UPDATE OF rental_rate tidak diperhatikan sejak awal. Hal ini membuktikan bahwa kombinasi OF <kolom> dan klausa WHEN efektif menyaring baik dari sisi kolom yang disentuh maupun dari sisi apakah nilainya benar-benar berubah.
+
+
+### Q11
+Perintah :
+CREATE OR REPLACE TRIGGER film_audit_harga
+AFTER UPDATE OF rental_rate ON lab4.film
+FOR EACH ROW
+WHEN (OLD.rental_rate <> NEW.rental_rate)
+EXECUTE FUNCTION lab4.catat_audit_harga();
+
+ALTER TABLE lab4.film ALTER COLUMN rental_rate DROP NOT NULL;
+
+UPDATE lab4.film SET rental_rate = NULL WHERE title = 'Film A Updated';   -- biasa -> NULL
+UPDATE lab4.film SET rental_rate = 3.99 WHERE title = 'Film A Updated';  -- NULL -> biasa
+
+SELECT * FROM lab4.audit_harga ORDER BY audit_id DESC LIMIT 5;
+
+ALTER TABLE lab4.film ALTER COLUMN rental_rate SET NOT NULL;
+
+-- Kembalikan ke versi aman untuk Q12–Q13
+CREATE OR REPLACE TRIGGER film_audit_harga
+AFTER UPDATE OF rental_rate ON lab4.film
+FOR EACH ROW
+WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate)
+EXECUTE FUNCTION lab4.catat_audit_harga();
+
+Keluaran : 
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q11_null_pada_trigger.sql 
+CREATE TRIGGER 
+ALTER TABLE 
+UPDATE 1 
+UPDATE 1 
+audit_id | film_id | harga_lama | harga_baru | diubah_oleh | diubah_pada 
+---------+---------+------------+------------+-------------+------------------------------- 
+1        | 1       | 0.99       | 2.99       | msbd        | 2026-09-15 16:21:25.741917+00 (1 row) ALTER TABLE CREATE TRIGGER
+
+Alasan : Trigger sengaja diganti agar klausa WHEN memakai operator <> alih-alih IS DISTINCT FROM. Kedua UPDATE (biasa -> NULL dan NULL -> biasa) sama-sama berhasil (UPDATE 1), namun tabel audit_harga tetap hanya menampilkan satu baris lama dari Q10, tidak bertambah sama sekali. Ini terjadi karena operator perbandingan biasa (<>) menghasilkan NULL, bukan true atau false, setiap kali salah satu operand bernilai NULL, dan PostgreSQL memperlakukan WHEN yang bernilai NULL sama seperti false sehingga trigger tidak pernah fire pada kedua transisi tersebut. Kemampuan yang tidak dimiliki operator <> inilah yang membuat perubahan menjadi NULL atau dari NULL berpotensi lolos tanpa tercatat pada mekanisme audit; IS DISTINCT FROM diperlukan justru karena ia memperlakukan NULL sebagai nilai yang bisa dibandingkan secara aman. Setelah pembuktian ini, kolom rental_rate dikembalikan menjadi NOT NULL dan trigger dikembalikan ke versi IS DISTINCT FROM supaya Q12-Q13 berjalan pada kondisi yang aman.
+
+### Q12
+Perintah :
+\timing on 
+UPDATE lab4.film SET rental_rate = rental_rate + 0.01; 
+ALTER TABLE lab4.film DISABLE TRIGGER film_audit_harga; 
+UPDATE lab4.film SET rental_rate = rental_rate + 0.01; 
+ALTER TABLE lab4.film ENABLE TRIGGER film_audit_harga;
+
+Keluaran : 
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q12_biaya_trigger_baris.sql 
+Timing is on. 
+UPDATE 3 
+Time: 7.501 ms 
+ALTER TABLE 
+Time: 4.732 ms 
+UPDATE 3 
+Time: 4.859 ms 
+ALTER TABLE 
+Time: 5.927 ms
+
+Alasan : UPDATE pertama dijalankan dengan trigger film_audit_harga masih aktif dan memakan waktu 7.501 ms untuk memperbarui 3 baris, karena setiap baris yang berubah memicu satu eksekusi fungsi trigger dan satu INSERT tambahan ke tabel audit_harga. Setelah trigger dinonaktifkan (DISABLE TRIGGER), UPDATE kedua terhadap 3 baris yang sama hanya memakan waktu 4.859 ms, lebih cepat karena tidak ada lagi biaya tambahan berupa pemanggilan fungsi PL/pgSQL dan penulisan baris audit per baris data. Meski selisihnya masih kecil karena tabel film hanya berisi sedikit baris, prinsipnya tetap terlihat: trigger FOR EACH ROW menambah biaya yang berbanding lurus dengan jumlah baris yang terkena UPDATE, sehingga pada tabel besar biaya tambahan ini akan jauh lebih terasa.
+
+### Q13
+Perintah :
+CREATE OR REPLACE FUNCTION lab4.catat_audit_massal()
+RETURNS trigger AS $$
+BEGIN
+    INSERT INTO lab4.audit_harga (film_id, harga_lama, harga_baru, diubah_oleh, diubah_pada)
+    SELECT lama.film_id, lama.rental_rate, baru.rental_rate, current_user, now()
+    FROM lama
+    JOIN baru ON lama.film_id = baru.film_id
+    WHERE lama.rental_rate IS DISTINCT FROM baru.rental_rate;
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER film_audit_harga_massal
+AFTER UPDATE ON lab4.film
+REFERENCING OLD TABLE AS lama NEW TABLE AS baru
+FOR EACH STATEMENT
+EXECUTE FUNCTION lab4.catat_audit_massal();
+
+-- Supaya perbandingan adil, matikan dulu trigger per-baris
+ALTER TABLE lab4.film DISABLE TRIGGER film_audit_harga;
+
+\timing on
+UPDATE lab4.film SET rental_rate = rental_rate + 0.01;
+
+Keluaran : 
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q13_trigger_pernyataan.sql 
+CREATE FUNCTION 
+CREATE TRIGGER 
+ALTER TABLE 
+Timing is on. 
+UPDATE 3 
+Time: 9.573 ms
+
+Alasan : Trigger film_audit_harga_massal didefinisikan sebagai FOR EACH STATEMENT dengan REFERENCING OLD TABLE AS lama NEW TABLE AS baru, artinya trigger ini hanya fire satu kali per pernyataan UPDATE, terlepas dari berapa banyak baris yang terkena dampak, dan mengakses seluruh baris lama maupun baru sekaligus melalui transition table lama dan baru. Fungsi kemudian menyisipkan baris audit hanya untuk baris yang harga_lama-nya benar-benar berbeda dari harga_baru menggunakan satu perintah INSERT ... SELECT ... JOIN. Trigger per-baris dimatikan lebih dulu agar perbandingan adil. Pada percobaan ini UPDATE 3 baris memakan waktu 9.573 ms, sedikit lebih lambat dibanding UPDATE tanpa trigger sama sekali pada Q12 (4.859 ms) karena tetap ada biaya membangun transition table dan menjalankan INSERT...SELECT satu kali. Pada tabel sekecil ini biaya tetap (fixed cost) trigger pernyataan belum terlihat menguntungkan; keunggulannya baru signifikan pada UPDATE massal beribu-ribu baris, karena trigger pernyataan hanya melakukan satu kali INSERT...SELECT alih-alih ribuan INSERT satu per satu seperti pada trigger per-baris.
+
+### Q14
+Perintah :
+-- Masukkan data rusak dulu, biar kontrasnya kelihatan INSERT INTO lab4.film (title, rental_rate, rating) VALUES ('Film Rusak Q14', -5.00, 'PG');
+
+-- Tahap 1: tambahkan aturan tanpa validasi data lama (cepat, tidak lock lama) ALTER TABLE lab4.film ADD CONSTRAINT film_rental_rate_non_negatif CHECK (rental_rate >= 0) NOT VALID; -- ^ ini BERHASIL walau ada baris negatif, karena NOT VALID cuma menjaga baris baru
+
+-- Buktikan validasi eksplisit gagal ALTER TABLE lab4.film VALIDATE CONSTRAINT film_rental_rate_non_negatif; -- ERROR: check constraint ... is violated by some row
+
+-- Perbaiki datanya UPDATE lab4.film SET rental_rate = 5.00 WHERE title = 'Film Rusak Q14';
+
+-- Ulangi validasi -> sekarang sukses ALTER TABLE lab4.film VALIDATE CONSTRAINT film_rental_rate_non_negatif;
+
+Keluaran : 
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q14_check_not_valid.sql 
+INSERT 0 1 
+ALTER TABLE ERROR: check constraint "film_rental_rate_non_negatif" of relation "film" is violated by some row 
+UPDATE 1 
+ALTER TABLE
+
+Alasan : Baris dengan rental_rate negatif (-5.00) sengaja disisipkan lebih dulu agar kontrasnya terlihat. Penambahan CHECK ... NOT VALID tetap berhasil (ALTER TABLE) meskipun sudah ada baris yang melanggar, karena NOT VALID membuat PostgreSQL hanya menerapkan aturan tersebut pada baris baru atau baris yang diubah setelahnya, tanpa memindai dan mengunci seluruh tabel untuk memvalidasi data lama. Ketika validasi eksplisit dijalankan lewat VALIDATE CONSTRAINT, PostgreSQL baru memindai seluruh baris dan menemukan pelanggaran pada Film Rusak Q14 sehingga muncul galat. Setelah data diperbaiki menjadi 5.00, VALIDATE CONSTRAINT diulang dan berhasil tanpa galat. Pola dua tahap (ADD ... NOT VALID lalu VALIDATE CONSTRAINT) ini penting pada tabel produksi berukuran besar karena menghindari lock panjang yang biasanya terjadi bila validasi data lama dan pemasangan aturan dilakukan sekaligus dalam satu perintah ALTER TABLE.
+
+### Q15
+ALTER TABLE lab4.film ADD COLUMN deleted_at timestamptz; ALTER TABLE lab4.film ADD CONSTRAINT film_judul_unik UNIQUE (title);
+
+-- Buktikan masalahnya UPDATE lab4.film SET deleted_at = now() WHERE title = 'Film A'; INSERT INTO lab4.film (title, rental_rate, rating) VALUES ('Film A', 3.99, 'PG'); -- ERROR: duplicate key value violates unique constraint "film_judul_unik" -- (padahal 'Film A' yang lama sudah soft-delete, seharusnya boleh daftar ulang)
+
+-- Setelah bukti masalah dicatat, ganti dengan unique index parsial ALTER TABLE lab4.film DROP CONSTRAINT film_judul_unik;
+
+CREATE UNIQUE INDEX ux_film_judul_aktif ON lab4.film (title) WHERE deleted_at IS NULL;
+
+-- Ulangi insert yang sama -> sekarang berhasil, karena baris lama sudah "tidak aktif" INSERT INTO lab4.film (title, rental_rate, rating) VALUES ('Film A', 3.99, 'PG');
+
+Keluaran : 
+$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q15_unique_soft_delete.sql 
+ALTER TABLE 
+ALTER TABLE 
+UPDATE 0 
+INSERT 0 1 
+ALTER TABLE 
+CREATE INDEX 
+ERROR: duplicate key value violates unique constraint "ux_film_judul_aktif" DETAIL: Key (title)=(Film A) already exists.
+
+Alasan : Kolom deleted_at dan constraint UNIQUE biasa pada title dipasang lebih dulu. Perintah UPDATE ... WHERE title = 'Film A' menghasilkan UPDATE 0 karena pada tahap ini baris berjudul 'Film A' sudah berganti nama menjadi 'Film A Updated' sejak Q10, sehingga tidak ada baris yang cocok untuk di-soft-delete. INSERT berikutnya dengan judul 'Film A' pun berhasil (INSERT 0 1) karena nama tersebut memang belum dipakai baris aktif mana pun. Setelah itu constraint UNIQUE biasa diganti dengan unique index parsial ux_film_judul_aktif yang hanya menegakkan keunikan title pada baris dengan deleted_at IS NULL (baris aktif). Ketika perintah INSERT dengan judul 'Film A' yang sama diulang sekali lagi, muncul galat duplicate key karena baris 'Film A' hasil INSERT sebelumnya masih berstatus aktif (deleted_at IS NULL). Hasil ini tetap membuktikan cara kerja index parsial dengan benar: ia hanya melarang duplikasi antar baris yang sama-sama aktif, dan akan membiarkan sebuah judul dipakai ulang apabila baris lama dengan judul tersebut sudah memiliki deleted_at terisi (soft-deleted), sesuatu yang tidak mungkin dicapai oleh constraint UNIQUE biasa karena UNIQUE biasa tidak mengenal konsep "aktif" atau "tidak aktif" pada datanya.
 
 ### Q16
 #### 1. NO ACTION
@@ -715,7 +894,14 @@ Sebagai kompromi konkret, laporan keuangan dapat menetapkan batas kebasian maksi
 
 Apabila refresh gagal di tengah proses, sistem sebaiknya tidak menghapus atau mengganti hasil refresh terakhir yang berhasil. Versi materialized view terakhir tetap digunakan sebagai data laporan, sementara kegagalan dicatat dalam log dan administrator diberi peringatan. Sistem kemudian dapat melakukan retry terbatas atau mencoba kembali pada jadwal refresh berikutnya. Dengan cara ini, kegagalan refresh tidak langsung membuat laporan menjadi tidak tersedia.
 
+Pertanyaan Reflektif C 
+Trigger per baris (FOR EACH ROW) tetap lebih tepat digunakan meskipun lebih lambat ketika logika yang dibutuhkan bergantung pada nilai OLD dan NEW dari setiap baris secara individual. Contohnya adalah ketika trigger digunakan untuk memvalidasi atau mengubah nilai kolom sebelum data disimpan (BEFORE INSERT/UPDATE), menerapkan aturan bisnis yang berlaku pada setiap baris, atau menjalankan proses yang harus terjadi satu kali untuk setiap baris yang berubah, seperti memperbarui saldo atau stok. Dalam kondisi seperti ini, kecepatan dapat dikorbankan demi ketepatan dan kontrol pada tingkat setiap baris.
 
+Salah satu kemampuan yang tidak dimiliki trigger pernyataan (FOR EACH STATEMENT) adalah kemampuan untuk mengakses dan memodifikasi nilai NEW atau OLD dari satu baris secara langsung. Trigger pernyataan hanya dijalankan satu kali untuk setiap perintah SQL dan menangani seluruh baris yang terpengaruh secara kolektif, misalnya melalui transition table (OLD TABLE/NEW TABLE). Karena itu, trigger pernyataan tidak dapat digunakan untuk mengubah nilai kolom suatu baris sebelum baris tersebut disimpan. Selain itu, trigger pernyataan tidak mengembalikan baris individual seperti RETURN NEW.
+
+Mengirim surel secara langsung dari dalam trigger juga buruk ketika transaksi mengalami ROLLBACK. Hal ini karena trigger dijalankan sebagai bagian dari transaksi yang sama dengan perintah DML yang memicunya. Jika trigger langsung mengirim surel ke layanan eksternal, surel tersebut sudah terkirim dan tidak dapat dibatalkan meskipun transaksi database akhirnya di-rollback. Akibatnya, pengguna dapat menerima notifikasi tentang perubahan data yang sebenarnya tidak pernah berhasil tersimpan di database.
+
+Pendekatan yang lebih aman adalah menggunakan pola outbox. Trigger cukup mencatat kebutuhan pengiriman surel ke dalam tabel antrean pada transaksi yang sama. Jika transaksi di-rollback, catatan tersebut juga ikut dibatalkan. Setelah transaksi berhasil COMMIT, proses terpisah dapat membaca antrean tersebut dan mengirimkan surel. Dengan cara ini, notifikasi hanya diproses untuk perubahan data yang benar-benar berhasil disimpan..
 
 Pertanyaan Reflektif E - Evolusi Skema
 - Jarak Rilis Ideal (0045 ke 0046): Diusulkan 7 hingga 14 hari (minimal 1 siklus sprint).  
