@@ -714,3 +714,13 @@ Materialized view memberikan waktu baca yang cepat karena hasil agregasi sudah d
 Sebagai kompromi konkret, laporan keuangan dapat menetapkan batas kebasian maksimal 15 menit. Materialized view dijadwalkan melakukan refresh setiap 10 menit, sehingga dalam kondisi normal data yang ditampilkan tidak lebih tua dari batas yang ditentukan. Penggunaan REFRESH MATERIALIZED VIEW CONCURRENTLY memungkinkan laporan tetap dapat dibaca ketika proses refresh berlangsung, sehingga kecepatan akses dan ketersediaan laporan tetap terjaga.
 
 Apabila refresh gagal di tengah proses, sistem sebaiknya tidak menghapus atau mengganti hasil refresh terakhir yang berhasil. Versi materialized view terakhir tetap digunakan sebagai data laporan, sementara kegagalan dicatat dalam log dan administrator diberi peringatan. Sistem kemudian dapat melakukan retry terbatas atau mencoba kembali pada jadwal refresh berikutnya. Dengan cara ini, kegagalan refresh tidak langsung membuat laporan menjadi tidak tersedia.
+
+
+
+Pertanyaan Reflektif E - Evolusi Skema
+- Jarak Rilis Ideal (0045 ke 0046): Diusulkan 7 hingga 14 hari (minimal 1 siklus sprint).  
+- Bukti Wajib Sebelum Eksekusi 0046:
+1. Log query aplikasi mencatatkan 0% akses langsung ke kolom rental_rate lama.  
+2. Query verifikasi Q19 menghasilkan konsisten 0.  
+3. Seluruh aplikasi telah diperbarui ke versi baru yang membaca tabel harga_film.  
+4. Sebab: Langkah 0046 bersifat destruktif dan tidak dapat di-rollback secara utuh.  
