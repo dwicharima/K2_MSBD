@@ -1,12 +1,12 @@
 # Laporan Latihan Kelompok Pertemuan 4
 
-| Nama | NIM | Kontribusi |
+| Nama | NIM | Kontribusi | Commit |
 |------|-----|------------|
-| Rasyd Arija Azron Ritonga | 251402020 |  |
-| Fakhry Adrian Daulay | 251402053 |  |
-| Dwi Charima Husni | 251402088 |  |
-| Agnes Natalia Br Siregar| 251402108 |  |
-| Abdullah Zufar Aulia Nasution | 251402111 |  |
+| Rasyd Arija Azron Ritonga | 251402020 |  |  |
+| Fakhry Adrian Daulay | 251402053 |  |  |
+| Dwi Charima Husni | 251402088 |  |  |
+| Agnes Natalia Br Siregar| 251402108 | |  |
+| Abdullah Zufar Aulia Nasution | 251402111 |  |  |
 
 ### Q1
 Perintah :
@@ -361,6 +361,333 @@ REFRESH MATERIALIZED VIEW
 -------
     52
 (1 row)
+
+### Q9
+### Q10
+### Q11
+### Q12
+### Q13
+### Q14
+### Q15
+
+
+### Q16
+#### 1. NO ACTION
+Perintah:
+CREATE TABLE lab4.ulasan_no_action (
+    ulasan_id bigserial PRIMARY KEY,
+    film_id integer NOT NULL,
+    isi_ulasan text,
+    CONSTRAINT fk_ulasan_film_no_action
+        FOREIGN KEY (film_id)
+        REFERENCES lab4.film (film_id)
+        ON DELETE NO ACTION
+);
+
+INSERT INTO lab4.ulasan_no_action (film_id, isi_ulasan)
+VALUES (1, 'Film bagus');
+
+DELETE FROM lab4.film
+WHERE film_id = 1;
+
+Keluaran:
+INSERT 0 1
+ERROR: update or delete on table "film" violates foreign key constraint
+"fk_ulasan_film_no_action" on table "ulasan_no_action"
+DETAIL: Key (film_id)=(1) is still referenced from table "ulasan_no_action".
+
+Alasan:
+Penghapusan film ditolak karena film_id = 1 masih digunakan oleh tabel ulasan_no_action. Pada NO ACTION, data induk tidak dapat dihapus apabila masih terdapat data anak yang mereferensikannya.
+
+#### 2. CASCADE
+Perintah:
+CREATE TABLE lab4.ulasan_cascade (
+    ulasan_id bigserial PRIMARY KEY,
+    film_id integer NOT NULL,
+    isi_ulasan text,
+    CONSTRAINT fk_ulasan_film_cascade
+        FOREIGN KEY (film_id)
+        REFERENCES lab4.film (film_id)
+        ON DELETE CASCADE
+);
+
+INSERT INTO lab4.ulasan_cascade (film_id, isi_ulasan)
+VALUES (2, 'Film sangat menarik');
+
+SELECT *
+FROM lab4.ulasan_cascade
+WHERE film_id = 2;
+
+DELETE FROM lab4.film
+WHERE film_id = 2;
+
+SELECT *
+FROM lab4.ulasan_cascade
+WHERE film_id = 2;
+
+Keluaran:
+INSERT 0 1
+
+ulasan_id | film_id |     isi_ulasan
+-----------+---------+---------------------
+1          | 2       | Film sangat menarik
+
+DELETE 1
+
+ulasan_id | film_id | isi_ulasan
+-----------+----------+------------
+(0 rows)
+
+Alasan:
+Ketika film_id = 2 dihapus dari tabel film, data ulasan yang memiliki film_id = 2 juga otomatis dihapus. Hal tersebut menunjukkan bahwa ON DELETE CASCADE meneruskan penghapusan dari tabel induk ke tabel anak.
+
+#### 3. SET NULL
+Perintah:
+CREATE TABLE lab4.ulasan_set_null (
+    ulasan_id bigserial PRIMARY KEY,
+    film_id integer,
+    isi_ulasan text,
+    CONSTRAINT fk_ulasan_film_set_null
+        FOREIGN KEY (film_id)
+        REFERENCES lab4.film (film_id)
+        ON DELETE SET NULL
+);
+
+INSERT INTO lab4.ulasan_set_null (film_id, isi_ulasan)
+VALUES (3, 'Film cukup bagus');
+
+SELECT *
+FROM lab4.ulasan_set_null
+WHERE film_id = 3;
+
+DELETE FROM lab4.film
+WHERE film_id = 3;
+
+SELECT *
+FROM lab4.ulasan_set_null
+WHERE ulasan_id = 1;
+
+Keluaran:
+
+INSERT 0 1
+
+ulasan_id | film_id |    isi_ulasan
+-----------+---------+------------------
+1          | 3       | Film cukup bagus
+
+DELETE 1
+
+ulasan_id | film_id |    isi_ulasan
+-----------+----------+------------------
+1          | NULL    | Film cukup bagus
+
+Alasan:
+Data film berhasil dihapus, tetapi data ulasan tetap dipertahankan. Nilai film_id pada ulasan berubah menjadi NULL. Hal ini menunjukkan bahwa ON DELETE SET NULL memutus hubungan dengan data induk tanpa menghapus data anak.
+
+### Q17 
+Membuat tabel harga film
+
+Perintah:
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+CREATE TABLE lab4.harga_film (
+    harga_film_id bigserial PRIMARY KEY,
+    film_id integer NOT NULL REFERENCES lab4.film (film_id),
+    wilayah text NOT NULL,
+    harga numeric(5,2) NOT NULL CHECK (harga >= 0),
+    berlaku daterange NOT NULL,
+    CONSTRAINT exclude_harga_film
+        EXCLUDE USING gist (
+            film_id WITH =,
+            wilayah WITH =,
+            berlaku WITH &&
+        )
+);
+
+Keluaran:
+CREATE EXTENSION
+CREATE TABLE
+
+Alasan:
+Extension btree_gist digunakan agar operator = dapat digunakan pada kolom dalam constraint EXCLUDE. Constraint tersebut memastikan kombinasi film_id, wilayah, dan periode berlaku tidak memiliki periode yang saling tumpang tindih.
+
+INSERT diterima
+
+Perintah:
+INSERT INTO lab4.harga_film
+    (film_id, wilayah, harga, berlaku)
+VALUES
+    (1, 'Indonesia', 25.00, '[2026-01-01,2026-04-01)');
+
+Keluaran:
+INSERT 0 1
+
+Alasan:
+Data berhasil dimasukkan karena belum terdapat data dengan film dan wilayah yang sama pada periode yang tumpang tindih.
+
+INSERT ditolak
+
+Perintah:
+INSERT INTO lab4.harga_film
+    (film_id, wilayah, harga, berlaku)
+VALUES
+    (1, 'Indonesia', 30.00, '[2026-03-01,2026-06-01)');
+
+Keluaran:
+ERROR: conflicting key value violates exclusion constraint
+"exclude_harga_film"
+
+Alasan:
+INSERT ditolak karena film_id = 1 dan wilayah Indonesia sama dengan data sebelumnya, sementara periode 2026-03-01 sampai 2026-06-01 tumpang tindih dengan periode 2026-01-01 sampai 2026-04-01.
+
+
+### Q18
+```sql
+-- Diminta: Membuat fase expand dengan struktur harga baru dan trigger tulis ganda agar perubahan rental_rate pada bentuk lama tercermin pada bentuk baru.
+
+-- Dipilih: Menggunakan trigger AFTER UPDATE pada lab4.film untuk menyinkronkan perubahan rental_rate ke lab4.harga_film, sehingga bentuk lama tetap dapat dibaca selama proses migrasi.
+
+-- Alternatif: Melakukan sinkronisasi harga secara manual setelah setiap perubahan; tidak dipilih karena perubahan dapat terlewat dan data pada bentuk baru tidak selalu terbarui.
+
+SET search_path = lab4, public;
+
+-- =========================================================
+-- 1. BUAT STRUKTUR BARU
+-- =========================================================
+
+DROP TABLE IF EXISTS lab4.harga_film CASCADE;
+
+CREATE TABLE lab4.harga_film (
+    harga_film_id bigserial PRIMARY KEY,
+    film_id integer NOT NULL REFERENCES lab4.film (film_id),
+    wilayah text NOT NULL,
+    harga numeric(5,2) NOT NULL CHECK (harga >= 0),
+    berlaku daterange NOT NULL,
+    CONSTRAINT exclude_harga_film
+        EXCLUDE USING gist (
+            film_id WITH =,
+            wilayah WITH =,
+            berlaku WITH &&
+        )
+);
+
+-- =========================================================
+-- 2. PASANG TULIS GANDA
+-- =========================================================
+
+CREATE OR REPLACE FUNCTION lab4.sinkronisasi_harga_film()
+RETURNS TRIGGER AS $$
+BEGIN
+    UPDATE lab4.harga_film
+    SET harga = NEW.rental_rate
+    WHERE film_id = NEW.film_id
+      AND wilayah = 'Indonesia'
+      AND upper_inf(berlaku);
+
+    IF NOT FOUND THEN
+        INSERT INTO lab4.harga_film
+            (film_id, wilayah, harga, berlaku)
+        VALUES
+            (
+                NEW.film_id,
+                'Indonesia',
+                NEW.rental_rate,
+                daterange(CURRENT_DATE, NULL, '[)')
+            );
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+DROP TRIGGER IF EXISTS trg_sinkronisasi_harga_film
+ON lab4.film;
+
+CREATE TRIGGER trg_sinkronisasi_harga_film
+AFTER UPDATE OF rental_rate ON lab4.film
+FOR EACH ROW
+EXECUTE FUNCTION lab4.sinkronisasi_harga_film();
+
+-- =========================================================
+-- 3. BACKFILL
+-- =========================================================
+
+INSERT INTO lab4.harga_film
+    (film_id, wilayah, harga, berlaku)
+SELECT
+    film_id,
+    'Indonesia',
+    rental_rate,
+    daterange(CURRENT_DATE, NULL, '[)')
+FROM lab4.film;
+
+-- =========================================================
+-- 4. VERIFIKASI
+-- =========================================================
+
+-- Melihat data harga setelah backfill
+SELECT
+    f.film_id,
+    f.title,
+    f.rental_rate,
+    h.wilayah,
+    h.harga,
+    h.berlaku
+FROM lab4.film f
+JOIN lab4.harga_film h
+    ON f.film_id = h.film_id
+ORDER BY f.film_id;
+
+-- Mengubah rental_rate pada bentuk lama
+UPDATE lab4.film
+SET rental_rate = rental_rate + 1.00
+WHERE film_id = 1;
+
+-- Memastikan perubahan tercermin pada bentuk baru
+SELECT
+    f.title,
+    f.rental_rate,
+    h.harga
+FROM lab4.film f
+JOIN lab4.harga_film h
+    ON f.film_id = h.film_id
+WHERE f.film_id = 1;
+
+-- =========================================================
+-- 5. VIEW FASAD
+-- =========================================================
+
+CREATE OR REPLACE VIEW lab4.film_harga AS
+SELECT
+    f.film_id,
+    f.title,
+    h.harga AS rental_rate,
+    h.wilayah,
+    h.berlaku
+FROM lab4.film f
+JOIN lab4.harga_film h
+    ON f.film_id = h.film_id;
+
+-- Menguji view fasad
+SELECT *
+FROM lab4.film_harga
+ORDER BY film_id;
+
+-- =========================================================
+-- 6. DROP BENTUK LAMA
+-- =========================================================
+
+-- Bentuk lama tidak langsung dihapus karena sesi pembaca
+-- masih menggunakan lab4.film selama proses migrasi.
+-- Setelah sesi pembaca selesai, bentuk lama dapat dihapus
+-- dengan perintah berikut:
+
+-- DROP TABLE lab4.film;
+```
+
+### Q19
+### Q20
+### Q21
 
 
 
