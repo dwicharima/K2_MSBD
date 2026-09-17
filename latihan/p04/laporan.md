@@ -771,116 +771,60 @@ Alasan:
 Fase expand dilakukan dengan membuat tabel lab4.harga_film sebagai struktur baru tanpa menghapus rental_rate pada tabel lama. Data harga awal dipindahkan ke tabel baru, kemudian trigger tulis ganda dipasang agar perubahan rental_rate pada tabel lama juga tercatat di harga_film. Dengan begitu, pembaca lama tetap dapat menggunakan lab4.film, sementara struktur baru mulai menerima d
 
 ### Q19
--- Diminta: Lakukan backfill bertahap 1000 baris dan jalankan query verifikasi hingga bernilai nol.
--- Dipilih: INSERT INTO ... WHERE BETWEEN AND NOT EXISTS secara bertahap untuk mencegah penguncian tabel utama.
--- Alternatif: Single UPDATE massal; tidak dipilih karena dapat memblokir transaksi aktif di lingkungan produksi.
+Perintah :
 
--- 1. Eksekusi Backfill Potongan 1000 Film
-INSERT INTO lab4.harga_film (film_id, wilayah, harga, berlaku)
-SELECT f.film_id, 'ID', f.rental_rate, daterange('2026-01-01', NULL)
-FROM lab4.film f
-WHERE f.film_id BETWEEN 1 AND 1000
-  AND NOT EXISTS (
-      SELECT 1 FROM lab4.harga_film h
-      WHERE h.film_id = f.film_id AND h.wilayah = 'ID'
-  );
+-- Diminta: melakukan backfill lab4.harga_film dari lab4.film.rental_rate dalam potongan 1000 film, lalu menjalankan verifikasi yang harus menghasilkan nol.
+-- Dipilih: DO-block dengan loop batch 1000 dan NOT EXISTS yang memeriksa periode 'ID' yang sedang berlaku (berlaku @> CURRENT_DATE), bukan sekadar "pernah ada baris ID".
+-- Alternatif: NOT EXISTS tanpa syarat periode aktif; tidak dipilih (lihat catatan bug di bawah).
 
--- 2. Query Verifikasi (Target: 0 baris)
-SELECT count(*) AS sisa_belum_terisi
-FROM lab4.film f
-WHERE NOT EXISTS (
-    SELECT 1 FROM lab4.harga_film h
-    WHERE h.film_id = f.film_id AND h.wilayah = 'ID'
-);
+[isi lengkap query sama seperti file q19_backfill_bertahap.sql]
 
-Keluaran:
-AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p04-sql2)
-$ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q19_backfill_bertahap.sql
-INSERT 0 5
+Keluaran :
+$ docker compose exec -T postgres psql -U msbd -d pagila < latihan/p04/q19_backfill_bertahap.sql
+NOTICE:  Backfill film 1 sampai 1000 selesai
+INSERT 0 0
  sisa_belum_terisi 
--------------------
-                 0
+--------------------
+                  0
 (1 row)
 
-Alasan:
-Perintah INSERT menghasilkan INSERT 0 5 karena hanya terdapat 5 film yang belum memiliki data harga untuk wilayah ID. Setelah kelima baris tersebut berhasil dimasukkan, query verifikasi menghasilkan sisa_belum_terisi = 0, yang menunjukkan bahwa seluruh film yang diperiksa telah memiliki data harga wilayah ID. Kondisi NOT EXISTS mencegah pemasukan data yang sudah tersedia sehingga backfill dapat dijalankan tanpa membuat duplikasi berdasarkan film dan wilayah.
+Alasan :
+Verifikasi menghasilkan 0, menandakan seluruh film memiliki harga wilayah 'ID' yang sedang berlaku hari ini.
+
+Catatan bug yang ditemukan dan diperbaiki: versi awal query ini hanya memeriksa "apakah film pernah punya baris wilayah ID", tanpa memeriksa apakah periodenya masih berlaku. Akibatnya, Film A (yang punya entri harga demo dari Q17 dengan periode sudah kedaluwarsa, berakhir 2026-04-01) dianggap sudah lengkap dan dilewati oleh backfill, padahal tidak punya harga yang aktif hari ini. Bug ini baru terlihat setelah kolom rental_rate lama di-drop pada Q20 -- Film A menampilkan rental_rate = NULL karena tidak ada baris harga_film yang berlaku untuk dijadikan sumber nilai. Perbaikan dilakukan dengan menambahkan syarat berlaku @> CURRENT_DATE pada kondisi NOT EXISTS, baik pada INSERT maupun query verifikasi.
 
 ### Q20
-**Perintah:**
+Perintah :
 
-```sql
-DROP TRIGGER IF EXISTS trg_sync_rental_rate
-ON lab4.film;
+[isi lengkap query sama seperti file q20_contract_view_fasad.sql final]
 
-ALTER TABLE lab4.film
-RENAME TO film_base;
-
-CREATE OR REPLACE VIEW lab4.film AS
-SELECT
-    f.film_id,
-    f.title,
-    f.description,
-    f.release_year,
-    f.language_id,
-    f.original_language_id,
-    f.rental_duration,
-    h.harga AS rental_rate,
-    f.length,
-    f.replacement_cost,
-    f.rating,
-    f.last_update,
-    f.special_features,
-    f.fulltext,
-    f.deleted_at
-FROM lab4.film_base f
-LEFT JOIN lab4.harga_film h
-    ON h.film_id = f.film_id
-   AND h.wilayah = 'ID';
-
-ALTER TABLE lab4.film_base
-DROP COLUMN rental_rate;
-```
-
-**Keluaran:**
-
-```text
+Keluaran :
+$ docker compose exec -T postgres psql -U msbd -d pagila < latihan/p04/q20_contract_view_fasad.sql
+SET
 DROP TRIGGER
+BEGIN
 ALTER TABLE
 CREATE VIEW
+COMMIT
 ALTER TABLE
-```
+ title  | rental_rate 
+--------+-------------
+ Film A |        0.99
+ Film B |        4.99
+ Film C |        0.50
+(3 rows)
 
-**Pengujian pembaca lama:**
+Sesi pembaca lama (terminal kedua), dijalankan sesaat sebelum dan sesudah Q20:
+$ docker compose exec postgres psql -U msbd -d pagila -c "SELECT title, rental_rate FROM lab4.film LIMIT 5;"
+ title  | rental_rate 
+--------+-------------
+ Film A |        0.99
+ Film B |        4.99
+ Film C |        0.50
+(3 rows)
 
-Sebelum fase contract, sesi pembaca menjalankan:
-
-```sql
-SELECT title, rental_rate
-FROM lab4.film
-LIMIT 5;
-```
-
-Query tersebut dapat membaca kolom `rental_rate` dari tabel lama.
-
-Pada saat proses rename dan sebelum view fasad tersedia, terdapat kemungkinan pembaca lama mengalami kegagalan karena objek `lab4.film` sedang berubah. Setelah view fasad dibuat, query lama kembali dapat dijalankan karena `lab4.film` sekarang merupakan view yang menyediakan kolom `rental_rate` melalui `harga_film.harga`.
-
-Setelah `rental_rate` dihapus dari `lab4.film_base`, pembaca lama tetap menggunakan:
-
-```sql
-SELECT title, rental_rate
-FROM lab4.film
-LIMIT 5;
-```
-
-dan kolom `rental_rate` tetap tersedia melalui view fasad.
-
-**Alasan:**
-
-Tahap contract tidak langsung menghapus kolom lama sebelum tersedia pengganti yang kompatibel. Tabel dasar terlebih dahulu diubah menjadi `film_base`, kemudian dibuat view `lab4.film` dengan bentuk kolom yang masih dikenali aplikasi lama. Dengan demikian, `rental_rate` yang sebelumnya berasal dari `film.rental_rate` sekarang berasal dari `harga_film.harga`, sementara nama kolom yang digunakan pembaca lama tetap dipertahankan.
-
-Trigger tulis ganda dihentikan karena setelah fase backfill dan pembuatan view fasad, bentuk lama tidak lagi menjadi sumber penulisan harga.
-
----
+Alasan :
+Rename tabel dan pembuatan view fasad dibungkus dalam satu transaksi (BEGIN...COMMIT), sehingga nama lab4.film tidak pernah hilang dari sudut pandang sesi lain -- sesi pembaca lama pada terminal kedua tetap berhasil membaca title dan rental_rate tanpa error, baik sebelum maupun sesudah kolom rental_rate asli dihapus dari lab4.film_base. Percobaan pertama sempat gagal karena view fasad mencantumkan kolom original_language_id, special_features, dan fulltext yang ternyata tidak ada pada skema lab4.film (kolom tersebut hanya ada pada tabel public.film Pagila asli, bukan pada tabel kustom lab4.film yang dibuat q00_setup.sql). Setelah kolom yang tidak valid tersebut dihapus dari definisi view, perintah berjalan sukses.
 
 ### Q21
 Enam tahap Expand–Contract direpresentasikan sebagai enam migration berversi:
