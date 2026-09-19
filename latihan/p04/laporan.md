@@ -67,6 +67,7 @@ CREATE VIEW
 ```
 Perintah ini berfungsi untuk membuat view fasad (tabel virtual) bernama lab4.film_murah yang menyaring data film dengan harga sewa rental_rate <= 0.99. Tanpa adanya CHECK OPTION, view ini bertindak sebagai jendela filter yang memperbolehkan operasi tulis ke tabel dasar tanpa memvalidasi apakah data baru tersebut benar-benar memenuhi kriteria WHERE.
 ```
+---
 
 ### Q2
 **Perintah :**
@@ -100,6 +101,8 @@ INSERT 0 1
 Terjadi silent filtering. Baris data dengan harga 4.99 berhasil masuk dan tersimpan secara fisik di dalam tabel dasar (lab4.film), namun langsung disaring keluar oleh kondisi WHERE pada view. Akibatnya, saat dicek melalui view, jumlah barisnya 0, sementara di tabel dasar data tersebut benar-benar ada. Hal ini berbahaya karena operasi insert tampak berhasil bagi aplikasi, padahal datanya tersembunyi dari view.
 ```
 
+---
+
 ### Q3
 **Perintah :**
 ```
@@ -131,6 +134,8 @@ DETAIL:  Failing row contains (6, Film Ditolak Q3, null, null, null, 3, 4.99, nu
 Penambahan WITH CASCADED CHECK OPTION memaksa PostgreSQL untuk memvalidasi setiap operasi INSERT atau UPDATE agar harus selalu mematuhi kondisi saringan WHERE (rental_rate <= 0.99). Karena data yang dimasukkan memiliki rental_rate = 4.99, operasi langsung ditolak mentah-mentah oleh sistem dan memunculkan galat.
 ```
 
+---
+
 ### Q4
 **Perintah :**
 ```
@@ -158,8 +163,11 @@ HINT:  To enable inserting into the view, provide an INSTEAD OF INSERT trigger o
 ```
 
 **Alasan :**
+```
 View yang mengandung fungsi agregat (count, avg) dan klausul pengelompokan (GROUP BY) bersifat not auto-updatable. PostgreSQL tidak memiliki mekanisme otomatis untuk memetakan kembali nilai agregat ke baris-baris data individual di dalam tabel dasar fisik, sehingga operasi INSERT ditolak kecuali jika dipasangkan dengan trigger khusus INSTEAD OF.
 ```
+
+---
 
 ### Q5
 **Perintah :**
@@ -255,6 +263,8 @@ Time: 618.533 ms
 Hasil Q5 menghasilkan 52 baris karena data akses tersebar pada 13 bulan kalender dan terdapat 4 kanal akses, sehingga terbentuk 13 × 4 = 52 kombinasi kelompok. Jumlah akses pada setiap kelompok berbeda karena data waktu dan kanal dibuat menggunakan nilai acak. Nilai film_unik hampir selalu mendekati 1.000 karena film_id dihasilkan secara acak pada rentang 1 sampai 1.000 dan jumlah transaksi pada setiap kelompok cukup besar sehingga hampir seluruh film muncul. Jumlah akses pada September 2025 dan September 2026 lebih sedikit karena kedua bulan tersebut hanya terwakili sebagian dalam rentang 365 hari saat data dibuat. Query membutuhkan waktu 618,533 ms pada lingkungan PostgreSQL yang digunakan.
 ```
 
+---
+
 ### Q6
 **Perintah :**
 ```
@@ -304,8 +314,11 @@ Time: 646.175 ms
 ```
 
 **Alasan :**
+```
 Materialized view lab4.ringkasan_akses berhasil dibuat menggunakan WITH NO DATA. Ketika materialized view tersebut dibaca sebelum dilakukan refresh, PostgreSQL menghasilkan error materialized view "ringkasan_akses" has not been populated. Setelah itu, REFRESH MATERIALIZED VIEW berhasil dijalankan dengan waktu 646.175 ms.
+```
 
+---
 
 ### Q7
 **Perintah :**
@@ -355,8 +368,11 @@ Time: 609.347 ms
 Percobaan menunjukkan bahwa REFRESH MATERIALIZED VIEW CONCURRENTLY memiliki persyaratan berupa unique index tanpa klausa WHERE pada materialized view. Percobaan pertama gagal dengan waktu 1.170 ms karena ringkasan_akses belum memiliki unique index. Setelah unique index pada (bulan, kanal) dibuat dengan waktu 4.578 ms, percobaan kedua berhasil melakukan refresh concurrent dengan waktu 609.347 ms. Dengan demikian, unique index diperlukan agar PostgreSQL dapat melakukan pembaruan materialized view secara concurrent.
 ```
 
+---
+
 ### Q8
 **Perintah :**
+```
 -- Diminta: membuktikan bahwa REFRESH MATERIALIZED VIEW CONCURRENTLY tidak
 -- memblokir pembaca, kemudian membandingkannya dengan refresh biasa.
 
@@ -381,7 +397,6 @@ FROM generate_series(1, 200000);
 
 -- Refresh concurrent.
 REFRESH MATERIALIZED VIEW CONCURRENTLY lab4.ringkasan_akses;
-
 
 -- ============================================================
 -- SESI 2
@@ -432,7 +447,11 @@ CREATE TRIGGER
 ```
 
 **Alasan :** 
+```
 Perintah ini membangun mekanisme audit trail sederhana. Tabel lab4.audit_harga dibuat untuk menyimpan riwayat perubahan harga, kemudian fungsi lab4.catat_audit_harga() didefinisikan untuk menyisipkan satu baris audit berisi harga lama, harga baru, pelaku, dan waktu perubahan. Trigger film_audit_harga dipasang sebagai AFTER UPDATE OF rental_rate FOR EACH ROW, artinya trigger hanya diperhatikan ketika kolom rental_rate ikut disebut pada klausa SET, dan ditambah klausa WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate) agar baris audit hanya benar-benar dicatat jika nilainya sungguh berubah, bukan sekadar ditulis ulang dengan nilai yang sama.
+```
+
+---
 
 ### Q10
 **Perintah :**
@@ -459,6 +478,8 @@ audit_id | film_id | harga_lama | harga_baru | diubah_oleh | diubah_pada
 ``` 
 Ketiga perintah UPDATE sama-sama berhasil mengenai satu baris (UPDATE 1), tetapi tabel audit_harga hanya berisi satu baris riwayat. UPDATE pertama benar-benar mengubah rental_rate dari 0.99 menjadi 2.99 sehingga klausa WHEN bernilai true dan trigger tercatat. UPDATE kedua menuliskan nilai 2.99 yang sama persis dengan nilai sebelumnya, sehingga OLD.rental_rate IS DISTINCT FROM NEW.rental_rate bernilai false dan trigger ditahan (tidak fire). UPDATE ketiga hanya mengubah kolom title, sama sekali tidak menyebut rental_rate pada SET, sehingga trigger AFTER UPDATE OF rental_rate tidak diperhatikan sejak awal. Hal ini membuktikan bahwa kombinasi OF <kolom> dan klausa WHEN efektif menyaring baik dari sisi kolom yang disentuh maupun dari sisi apakah nilainya benar-benar berubah.
 ```
+
+---
 
 ### Q11
 **Perintah :**
@@ -499,7 +520,11 @@ audit_id | film_id | harga_lama | harga_baru | diubah_oleh | diubah_pada
 ```
 
 **Alasan :** 
+```
 Trigger sengaja diganti agar klausa WHEN memakai operator <> alih-alih IS DISTINCT FROM. Kedua UPDATE (biasa -> NULL dan NULL -> biasa) sama-sama berhasil (UPDATE 1), namun tabel audit_harga tetap hanya menampilkan satu baris lama dari Q10, tidak bertambah sama sekali. Ini terjadi karena operator perbandingan biasa (<>) menghasilkan NULL, bukan true atau false, setiap kali salah satu operand bernilai NULL, dan PostgreSQL memperlakukan WHEN yang bernilai NULL sama seperti false sehingga trigger tidak pernah fire pada kedua transisi tersebut. Kemampuan yang tidak dimiliki operator <> inilah yang membuat perubahan menjadi NULL atau dari NULL berpotensi lolos tanpa tercatat pada mekanisme audit; IS DISTINCT FROM diperlukan justru karena ia memperlakukan NULL sebagai nilai yang bisa dibandingkan secara aman. Setelah pembuktian ini, kolom rental_rate dikembalikan menjadi NOT NULL dan trigger dikembalikan ke versi IS DISTINCT FROM supaya Q12-Q13 berjalan pada kondisi yang aman.
+```
+
+---
 
 ### Q12
 **Perintah :**
@@ -529,6 +554,8 @@ Time: 5.927 ms
 ```
 UPDATE pertama dijalankan dengan trigger film_audit_harga masih aktif dan memakan waktu 7.501 ms untuk memperbarui 3 baris, karena setiap baris yang berubah memicu satu eksekusi fungsi trigger dan satu INSERT tambahan ke tabel audit_harga. Setelah trigger dinonaktifkan (DISABLE TRIGGER), UPDATE kedua terhadap 3 baris yang sama hanya memakan waktu 4.859 ms, lebih cepat karena tidak ada lagi biaya tambahan berupa pemanggilan fungsi PL/pgSQL dan penulisan baris audit per baris data. Meski selisihnya masih kecil karena tabel film hanya berisi sedikit baris, prinsipnya tetap terlihat: trigger FOR EACH ROW menambah biaya yang berbanding lurus dengan jumlah baris yang terkena UPDATE, sehingga pada tabel besar biaya tambahan ini akan jauh lebih terasa.
 ```
+
+---
 
 ### Q13
 **Perintah :**
@@ -574,6 +601,8 @@ Time: 9.573 ms
 Trigger film_audit_harga_massal didefinisikan sebagai FOR EACH STATEMENT dengan REFERENCING OLD TABLE AS lama NEW TABLE AS baru, artinya trigger ini hanya fire satu kali per pernyataan UPDATE, terlepas dari berapa banyak baris yang terkena dampak, dan mengakses seluruh baris lama maupun baru sekaligus melalui transition table lama dan baru. Fungsi kemudian menyisipkan baris audit hanya untuk baris yang harga_lama-nya benar-benar berbeda dari harga_baru menggunakan satu perintah INSERT ... SELECT ... JOIN. Trigger per-baris dimatikan lebih dulu agar perbandingan adil. Pada percobaan ini UPDATE 3 baris memakan waktu 9.573 ms, sedikit lebih lambat dibanding UPDATE tanpa trigger sama sekali pada Q12 (4.859 ms) karena tetap ada biaya membangun transition table dan menjalankan INSERT...SELECT satu kali. Pada tabel sekecil ini biaya tetap (fixed cost) trigger pernyataan belum terlihat menguntungkan; keunggulannya baru signifikan pada UPDATE massal beribu-ribu baris, karena trigger pernyataan hanya melakukan satu kali INSERT...SELECT alih-alih ribuan INSERT satu per satu seperti pada trigger per-baris.
 ```
 
+---
+
 ### Q14
 **Perintah :**
 ```
@@ -582,6 +611,7 @@ Trigger film_audit_harga_massal didefinisikan sebagai FOR EACH STATEMENT dengan 
 -- Buktikan validasi eksplisit gagal ALTER TABLE lab4.film VALIDATE CONSTRAINT film_rental_rate_non_negatif; -- ERROR: check constraint ... is violated by some row
 -- Perbaiki datanya UPDATE lab4.film SET rental_rate = 5.00 WHERE title = 'Film Rusak Q14';
 -- Ulangi validasi -> sekarang sukses ALTER TABLE lab4.film VALIDATE CONSTRAINT film_rental_rate_non_negatif;
+```
 
 **Keluaran :**
 ```
@@ -596,6 +626,9 @@ ALTER TABLE
 ```
 Baris dengan rental_rate negatif (-5.00) sengaja disisipkan lebih dulu agar kontrasnya terlihat. Penambahan CHECK ... NOT VALID tetap berhasil (ALTER TABLE) meskipun sudah ada baris yang melanggar, karena NOT VALID membuat PostgreSQL hanya menerapkan aturan tersebut pada baris baru atau baris yang diubah setelahnya, tanpa memindai dan mengunci seluruh tabel untuk memvalidasi data lama. Ketika validasi eksplisit dijalankan lewat VALIDATE CONSTRAINT, PostgreSQL baru memindai seluruh baris dan menemukan pelanggaran pada Film Rusak Q14 sehingga muncul galat. Setelah data diperbaiki menjadi 5.00, VALIDATE CONSTRAINT diulang dan berhasil tanpa galat. Pola dua tahap (ADD ... NOT VALID lalu VALIDATE CONSTRAINT) ini penting pada tabel produksi berukuran besar karena menghindari lock panjang yang biasanya terjadi bila validasi data lama dan pemasangan aturan dilakukan sekaligus dalam satu perintah ALTER TABLE.
 **
+```
+
+---
 
 ### Q15
 **Perintah :**
@@ -628,6 +661,8 @@ ERROR: duplicate key value violates unique constraint "ux_film_judul_aktif" DETA
 Kolom deleted_at dan constraint UNIQUE biasa pada title dipasang lebih dulu. Perintah UPDATE ... WHERE title = 'Film A' menghasilkan UPDATE 0 karena pada tahap ini baris berjudul 'Film A' sudah berganti nama menjadi 'Film A Updated' sejak Q10, sehingga tidak ada baris yang cocok untuk di-soft-delete. INSERT berikutnya dengan judul 'Film A' pun berhasil (INSERT 0 1) karena nama tersebut memang belum dipakai baris aktif mana pun. Setelah itu constraint UNIQUE biasa diganti dengan unique index parsial ux_film_judul_aktif yang hanya menegakkan keunikan title pada baris dengan deleted_at IS NULL (baris aktif). Ketika perintah INSERT dengan judul 'Film A' yang sama diulang sekali lagi, muncul galat duplicate key karena baris 'Film A' hasil INSERT sebelumnya masih berstatus aktif (deleted_at IS NULL). Hasil ini tetap membuktikan cara kerja index parsial dengan benar: ia hanya melarang duplikasi antar baris yang sama-sama aktif, dan akan membiarkan sebuah judul dipakai ulang apabila baris lama dengan judul tersebut sudah memiliki deleted_at terisi (soft-deleted), sesuatu yang tidak mungkin dicapai oleh constraint UNIQUE biasa karena UNIQUE biasa tidak mengenal konsep "aktif" atau "tidak aktif" pada datanya.
 ```
 
+---
+
 ### Q16
 #### 1. NO ACTION
 **Perintah :**
@@ -646,7 +681,8 @@ psql:/proc/self/fd/0:28: ERROR:  update or delete on table "film" violates forei
 DETAIL:  Key (film_id)=(1) is still referenced from table "harga_film".
 ```
 
-```Alasan :```
+**Alasan :**
+```
 NO ACTION mencegah penghapusan Film 1 karena masih terdapat data yang mereferensikan film tersebut melalui foreign key.
 ```
 
@@ -695,6 +731,8 @@ DELETE 1
 SET NULL mempertahankan data ulasan setelah Film 3 dihapus, tetapi nilai film_id pada ulasan diubah menjadi NULL.
 ```
 
+---
+
 ### Q17 
 **Perintah :**
 ```
@@ -722,7 +760,7 @@ Extension btree_gist digunakan untuk mendukung operator yang diperlukan oleh EXC
 ```
 
 #### INSERT kedua
-***Keluaran :***
+**Keluaran :**
 ```
 ERROR:  conflicting key value violates exclusion constraint "harga_film_film_id_wilayah_berlaku_excl"
 DETAIL:  Key (film_id, wilayah, berlaku)=(1, ID, [2026-03-01,2026-06-01)) conflicts with existing key (film_id, wilayah, berlaku)=(1, ID, [2026-01-01,2026-04-01)).
@@ -732,6 +770,7 @@ DETAIL:  Key (film_id, wilayah, berlaku)=(1, ID, [2026-03-01,2026-06-01)) confli
 ```
 INSERT kedua ditolak karena memiliki film_id dan wilayah yang sama dengan data sebelumnya, sementara periode [2026-03-01,2026-06-01) tumpang tindih dengan [2026-01-01,2026-04-01). Constraint EXCLUDE mencegah kondisi tersebut.
 ```
+---
 
 ### Q18
 **Perintah :**
@@ -758,6 +797,8 @@ CREATE FUNCTION
 DROP TRIGGER
 CREATE TRIGGER
 ```
+
+---
 
 ### Q19
 **Perintah :**
@@ -786,6 +827,8 @@ Verifikasi menghasilkan 0, menandakan seluruh film memiliki harga wilayah 'ID' y
 
 Catatan bug yang ditemukan dan diperbaiki: versi awal query ini hanya memeriksa "apakah film pernah punya baris wilayah ID", tanpa memeriksa apakah periodenya masih berlaku. Akibatnya, Film A (yang punya entri harga demo dari Q17 dengan periode sudah kedaluwarsa, berakhir 2026-04-01) dianggap sudah lengkap dan dilewati oleh backfill, padahal tidak punya harga yang aktif hari ini. Bug ini baru terlihat setelah kolom rental_rate lama di-drop pada Q20 -- Film A menampilkan rental_rate = NULL karena tidak ada baris harga_film yang berlaku untuk dijadikan sumber nilai. Perbaikan dilakukan dengan menambahkan syarat berlaku @> CURRENT_DATE pada kondisi NOT EXISTS, baik pada INSERT maupun query verifikasi.
 ```
+
+---
 
 ### Q20
 **Perintah :**
@@ -824,6 +867,8 @@ $ docker compose exec postgres psql -U msbd -d pagila -c "SELECT title, rental_r
 ```
 Rename tabel dan pembuatan view fasad dibungkus dalam satu transaksi (BEGIN...COMMIT), sehingga nama lab4.film tidak pernah hilang dari sudut pandang sesi lain -- sesi pembaca lama pada terminal kedua tetap berhasil membaca title dan rental_rate tanpa error, baik sebelum maupun sesudah kolom rental_rate asli dihapus dari lab4.film_base. Percobaan pertama sempat gagal karena view fasad mencantumkan kolom original_language_id, special_features, dan fulltext yang ternyata tidak ada pada skema lab4.film (kolom tersebut hanya ada pada tabel public.film Pagila asli, bukan pada tabel kustom lab4.film yang dibuat q00_setup.sql). Setelah kolom yang tidak valid tersebut dihapus dari definisi view, perintah berjalan sukses.
 ```
+
+---
 
 ### Q21
 Enam tahap Expand–Contract direpresentasikan sebagai enam migration berversi:
@@ -872,6 +917,7 @@ Migration `0041` sampai `0045` relatif dapat dikembalikan sesuai objek yang dibu
 
 Oleh karena itu, `0046` tidak boleh dijalankan sebelum hasil verifikasi Q19 bernilai `0`, view fasad terbukti dapat digunakan oleh pembaca lama, dan bukti bahwa aplikasi sudah tidak bergantung langsung pada kolom lama telah dikumpulkan.
 
+---
 
 ## Refleksi A–E
 
@@ -894,19 +940,19 @@ Pendekatan ini justru mempersulit tim saat aplikasi melakukan debugging atau bul
 Tim keuangan menginginkan laporan yang selalu mutakhir sekaligus selalu cepat. Jelaskan trade-off materialized view dan usulkan kompromi konkret: batas kebasian, jadwal refresh, dan tindakan saat refresh gagal di tengah jalan.
 > Materialized view memberikan waktu baca yang cepat karena hasil agregasi sudah disimpan secara fisik. Namun, data di dalamnya tidak otomatis berubah ketika tabel sumber berubah. Semakin lama interval refresh, semakin besar kemungkinan laporan menampilkan data yang sudah tidak mutakhir. Sebaliknya, semakin sering materialized view di-refresh, semakin besar beban komputasi yang diberikan kepada database. REFRESH CONCURRENTLY mengurangi gangguan terhadap pembaca, tetapi membutuhkan unique index dan umumnya memiliki pekerjaan tambahan dibandingkan refresh biasa.
 
-Sebagai kompromi konkret, laporan keuangan dapat menetapkan batas kebasian maksimal 15 menit. Materialized view dijadwalkan melakukan refresh setiap 10 menit, sehingga dalam kondisi normal data yang ditampilkan tidak lebih tua dari batas yang ditentukan. Penggunaan REFRESH MATERIALIZED VIEW CONCURRENTLY memungkinkan laporan tetap dapat dibaca ketika proses refresh berlangsung, sehingga kecepatan akses dan ketersediaan laporan tetap terjaga.
+> Sebagai kompromi konkret, laporan keuangan dapat menetapkan batas kebasian maksimal 15 menit. Materialized view dijadwalkan melakukan refresh setiap 10 menit, sehingga dalam kondisi normal data yang ditampilkan tidak lebih tua dari batas yang ditentukan. Penggunaan REFRESH MATERIALIZED VIEW CONCURRENTLY memungkinkan laporan tetap dapat dibaca ketika proses refresh berlangsung, sehingga kecepatan akses dan ketersediaan laporan tetap terjaga.
 
-Apabila refresh gagal di tengah proses, sistem sebaiknya tidak menghapus atau mengganti hasil refresh terakhir yang berhasil. Versi materialized view terakhir tetap digunakan sebagai data laporan, sementara kegagalan dicatat dalam log dan administrator diberi peringatan. Sistem kemudian dapat melakukan retry terbatas atau mencoba kembali pada jadwal refresh berikutnya. Dengan cara ini, kegagalan refresh tidak langsung membuat laporan menjadi tidak tersedia.
+> Apabila refresh gagal di tengah proses, sistem sebaiknya tidak menghapus atau mengganti hasil refresh terakhir yang berhasil. Versi materialized view terakhir tetap digunakan sebagai data laporan, sementara kegagalan dicatat dalam log dan administrator diberi peringatan. Sistem kemudian dapat melakukan retry terbatas atau mencoba kembali pada jadwal refresh berikutnya. Dengan cara ini, kegagalan refresh tidak langsung membuat laporan menjadi tidak tersedia.
 
 ### Pertanyaan Reflektif C 
 Berdasarkan angka Q12 dan Q13, kapan trigger per baris tetap lebih tepat walaupun lebih lambat? Sebutkan satu kemampuan yang tidak dimiliki trigger pernyataan. Jelaskan pula mengapa mengirim surel langsung dari trigger buruk ketika transaksi di-rollback.
 > Trigger per baris (FOR EACH ROW) tetap lebih tepat digunakan meskipun lebih lambat ketika logika yang dibutuhkan bergantung pada nilai OLD dan NEW dari setiap baris secara individual. Contohnya adalah ketika trigger digunakan untuk memvalidasi atau mengubah nilai kolom sebelum data disimpan (BEFORE INSERT/UPDATE), menerapkan aturan bisnis yang berlaku pada setiap baris, atau menjalankan proses yang harus terjadi satu kali untuk setiap baris yang berubah, seperti memperbarui saldo atau stok. Dalam kondisi seperti ini, kecepatan dapat dikorbankan demi ketepatan dan kontrol pada tingkat setiap baris.
 
-Salah satu kemampuan yang tidak dimiliki trigger pernyataan (FOR EACH STATEMENT) adalah kemampuan untuk mengakses dan memodifikasi nilai NEW atau OLD dari satu baris secara langsung. Trigger pernyataan hanya dijalankan satu kali untuk setiap perintah SQL dan menangani seluruh baris yang terpengaruh secara kolektif, misalnya melalui transition table (OLD TABLE/NEW TABLE). Karena itu, trigger pernyataan tidak dapat digunakan untuk mengubah nilai kolom suatu baris sebelum baris tersebut disimpan. Selain itu, trigger pernyataan tidak mengembalikan baris individual seperti RETURN NEW.
+> Salah satu kemampuan yang tidak dimiliki trigger pernyataan (FOR EACH STATEMENT) adalah kemampuan untuk mengakses dan memodifikasi nilai NEW atau OLD dari satu baris secara langsung. Trigger pernyataan hanya dijalankan satu kali untuk setiap perintah SQL dan menangani seluruh baris yang terpengaruh secara kolektif, misalnya melalui transition table (OLD TABLE/NEW TABLE). Karena itu, trigger pernyataan tidak dapat digunakan untuk mengubah nilai kolom suatu baris sebelum baris tersebut disimpan. Selain itu, trigger pernyataan tidak mengembalikan baris individual seperti RETURN NEW.
 
-Mengirim surel secara langsung dari dalam trigger juga buruk ketika transaksi mengalami ROLLBACK. Hal ini karena trigger dijalankan sebagai bagian dari transaksi yang sama dengan perintah DML yang memicunya. Jika trigger langsung mengirim surel ke layanan eksternal, surel tersebut sudah terkirim dan tidak dapat dibatalkan meskipun transaksi database akhirnya di-rollback. Akibatnya, pengguna dapat menerima notifikasi tentang perubahan data yang sebenarnya tidak pernah berhasil tersimpan di database.
+> Mengirim surel secara langsung dari dalam trigger juga buruk ketika transaksi mengalami ROLLBACK. Hal ini karena trigger dijalankan sebagai bagian dari transaksi yang sama dengan perintah DML yang memicunya. Jika trigger langsung mengirim surel ke layanan eksternal, surel tersebut sudah terkirim dan tidak dapat dibatalkan meskipun transaksi database akhirnya di-rollback. Akibatnya, pengguna dapat menerima notifikasi tentang perubahan data yang sebenarnya tidak pernah berhasil tersimpan di database.
 
-Pendekatan yang lebih aman adalah menggunakan pola outbox. Trigger cukup mencatat kebutuhan pengiriman surel ke dalam tabel antrean pada transaksi yang sama. Jika transaksi di-rollback, catatan tersebut juga ikut dibatalkan. Setelah transaksi berhasil COMMIT, proses terpisah dapat membaca antrean tersebut dan mengirimkan surel. Dengan cara ini, notifikasi hanya diproses untuk perubahan data yang benar-benar berhasil disimpan.
+> Pendekatan yang lebih aman adalah menggunakan pola outbox. Trigger cukup mencatat kebutuhan pengiriman surel ke dalam tabel antrean pada transaksi yang sama. Jika transaksi di-rollback, catatan tersebut juga ikut dibatalkan. Setelah transaksi berhasil COMMIT, proses terpisah dapat membaca antrean tersebut dan mengirimkan surel. Dengan cara ini, notifikasi hanya diproses untuk perubahan data yang benar-benar berhasil disimpan.
 
 ### Pertanyaan Reflektif D
 Aturan periode harga tidak tumpang tindih dapat ditulis sebagai trigger yang membaca tabel sebelum INSERT. Jelaskan mengapa trigger itu bisa gagal ketika dua transaksi berjalan bersamaan, sedangkan EXCLUDE tidak, dengan bahasa Anda sendiri.
@@ -917,12 +963,13 @@ Sedangkan **EXCLUDE constraint** digunakan untuk mencegah data yang saling berta
 ### Pertanyaan Reflektif E 
 Berapa lama jarak rilis yang Anda usulkan antara 0045 dan 0046? Bukti apa yang harus dikumpulkan sebelum berani menjalankan 0046, mengingat isinya tidak dapat dikembalikan sepenuhnya?
 > - Jarak Rilis Ideal (0045 ke 0046): Diusulkan 7 hingga 14 hari (minimal 1 siklus sprint).  
-- Bukti Wajib Sebelum Eksekusi 0046:
+> - Bukti Wajib Sebelum Eksekusi 0046:
+```
 1. Log query aplikasi mencatatkan 0% akses langsung ke kolom rental_rate lama.  
 2. Query verifikasi Q19 menghasilkan konsisten 0.  
 3. Seluruh aplikasi telah diperbarui ke versi baru yang membaca tabel harga_film.  
 4. Sebab: Langkah 0046 bersifat destruktif dan tidak dapat di-rollback secara utuh.  
-
+```
 ---
 
 ## Ringkasan Waktu
@@ -941,3 +988,6 @@ Berapa lama jarak rilis yang Anda usulkan antara 0045 dan 0046? Bukti apa yang h
 ### Struktur Folder Migrations
 
 ![alt text](struktur_migrations.png)
+
+### Tautan Merge Request
+https://github.com/dwicharima/K2_MSBD/pull/2
