@@ -1,16 +1,19 @@
 # Laporan Latihan Kelompok Pertemuan 4
 
-| Nama | NIM | Kontribusi | Commit |
+| Nama | NIM | Kontribusi |
 |------|-----|------------|
-| Agnes Natalia Siregar| 251402108 | Q1-Q4, refleksi A |
-| Fakhry Adrian Daulay | |
-| Rasyd Arija Ritonga | |
-| Dwi Charima Husni | 251402088 | Q16-Q18, refleksi D|
-| Abdullah Zufar Aulia | 251402111 | Q19-Q21, reflektif E|
+| Agnes Natalia Siregar | 251402108 | Q1-Q4, refleksi A |
+| Fakhry Adrian Daulay | 251402053 | Q5-Q8, refleksi B | 
+| Rasyd Arija A. Ritonga |251402020 | Q9-Q15, refleksi C | 
+| Dwi Charima Husni | 251402088 | Q16-Q18, refleksi D |
+| Abdullah Zufar Aulia | 251402111 | Q19-Q21, reflektif E |
+
+---
 
 ### Q1
-Perintah :
 
+**Perintah :**
+```
 CREATE SCHEMA IF NOT EXISTS lab4;
 SET search_path = lab4, public;
 
@@ -51,18 +54,23 @@ FROM generate_series(1, 500000);
 
 ANALYZE lab4.jejak_akses;
 SELECT count(*) FROM lab4.jejak_akses;
+```
 
-Keluaran :
+**Keluaran :**
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 ~/msbd-2026 (latihan/p04-sql2)
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q01_view_film_murah.sql
 CREATE VIEW
+```
 
-Alasan :
+**Alasan :**
+```
 Perintah ini berfungsi untuk membuat view fasad (tabel virtual) bernama lab4.film_murah yang menyaring data film dengan harga sewa rental_rate <= 0.99. Tanpa adanya CHECK OPTION, view ini bertindak sebagai jendela filter yang memperbolehkan operasi tulis ke tabel dasar tanpa memvalidasi apakah data baru tersebut benar-benar memenuhi kriteria WHERE.
-
+```
 
 ### Q2
-Perintah :
+**Perintah :**
+```
 -- Diminta: menyisipkan satu film melalui view lab4.film_murah dengan rental_rate = 4.99, menghitung jumlah baris dengan judul yang sama di view dan tabel dasar, lalu menjelaskan selisihnya.
 -- Dipilih: Melakukan INSERT melalui view tanpa check option dilanjutkan dengan query UNION ALL untuk menghitung baris di view dan tabel dasar agar silent filtering terlihat jelas.
 -- Alternatif: Melakukan INSERT langsung ke tabel dasar; tidak dipilih karena tidak menguji perilaku mutasi data melalui view fasad.
@@ -73,8 +81,10 @@ VALUES ('Film Gaib Q2', 4.99, 'PG');
 SELECT 'Di View' AS lokasi, count(*) FROM lab4.film_murah WHERE title = 'Film Gaib Q2'
 UNION ALL
 SELECT 'Di Tabel Dasar' AS lokasi, count(*) FROM lab4.film WHERE title = 'Film Gaib Q2';
+```
 
-Keluaran :
+**Keluaran :**
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 ~/msbd-2026 (latihan/p04-sql2)
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q02_baris_menghilang.sql
 INSERT 0 1
@@ -83,13 +93,16 @@ INSERT 0 1
  Di View        |     0
  Di Tabel Dasar |     2
 (2 rows)
+```
 
-Alasan :
+**Alasan :**
+```
 Terjadi silent filtering. Baris data dengan harga 4.99 berhasil masuk dan tersimpan secara fisik di dalam tabel dasar (lab4.film), namun langsung disaring keluar oleh kondisi WHERE pada view. Akibatnya, saat dicek melalui view, jumlah barisnya 0, sementara di tabel dasar data tersebut benar-benar ada. Hal ini berbahaya karena operasi insert tampak berhasil bagi aplikasi, padahal datanya tersembunyi dari view.
-
+```
 
 ### Q3
-Perintah :
+**Perintah :**
+```
 -- Diminta: membuat ulang view lab4.film_murah dengan WITH CASCADED CHECK OPTION, mengulangi penyisipan data dengan rental_rate = 4.99, dan menyalin pesan galat secara utuh.
 -- Dipilih: Menggunakan CREATE OR REPLACE VIEW ditambah klausa WITH CASCADED CHECK OPTION agar setiap data yang dimasukkan wajib lolos dari filter WHERE view.
 -- Alternatif: Menggunakan WITH LOCAL CHECK OPTION; tidak dipilih karena untuk view tunggal tanpa view bertingkat, cascaded lebih aman untuk memastikan tidak ada celah aturan filter.
@@ -102,20 +115,25 @@ WITH CASCADED CHECK OPTION;
 
 INSERT INTO lab4.film_murah (title, rental_rate, rating)
 VALUES ('Film Ditolak Q3', 4.99, 'PG');
+```
 
-Keluaran :
+**Keluaran :**
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 ~/msbd-2026 (latihan/p04-sql2)
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q03_check_option.sql
 CREATE VIEW
 ERROR:  new row violates check option for view "film_murah"
 DETAIL:  Failing row contains (6, Film Ditolak Q3, null, null, null, 3, 4.99, null, null, PG, 2026-09-14 13:33:37.564375).
+```
 
-Alasan :
+**Alasan :**
+```
 Penambahan WITH CASCADED CHECK OPTION memaksa PostgreSQL untuk memvalidasi setiap operasi INSERT atau UPDATE agar harus selalu mematuhi kondisi saringan WHERE (rental_rate <= 0.99). Karena data yang dimasukkan memiliki rental_rate = 4.99, operasi langsung ditolak mentah-mentah oleh sistem dan memunculkan galat.
-
+```
 
 ### Q4
-Perintah :
+**Perintah :**
+```
 -- Diminta: membuat view lab4.pendapatan_kategori yang menggunakan GROUP BY, mencoba menyisipkan data melaluinya, lalu menjelaskan alasan view tersebut tidak auto-updatable.
 -- Dipilih: Membuat view dengan fungsi agregat count dan avg beserta GROUP BY rating untuk melihat pembatasan mutasi data pada view non-updatable.
 -- Alternatif: Menggunakan view biasa tanpa agregasi; tidak dipilih karena tidak sesuai dengan soal yang menguji batasan view berbasis agregasi.
@@ -127,20 +145,25 @@ GROUP BY rating;
 
 INSERT INTO lab4.pendapatan_kategori (rating, total_film, rata_rental)
 VALUES ('NC-17', 10, 3.50);
+```
 
-Keluaran :
+**Keluaran :**
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 ~/msbd-2026 (latihan/p04-sql2)
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q04_view_pendapatan_kategori.sql
 CREATE VIEW
 ERROR:  cannot insert into view "pendapatan_kategori"
 DETAIL:  Views containing GROUP BY are not automatically updatable.
 HINT:  To enable inserting into the view, provide an INSTEAD OF INSERT trigger or an unconditional ON INSERT DO INSTEAD rule.
+```
 
-Alasan :
+**Alasan :**
 View yang mengandung fungsi agregat (count, avg) dan klausul pengelompokan (GROUP BY) bersifat not auto-updatable. PostgreSQL tidak memiliki mekanisme otomatis untuk memetakan kembali nilai agregat ke baris-baris data individual di dalam tabel dasar fisik, sehingga operasi INSERT ditolak kecuali jika dipasangkan dengan trigger khusus INSTEAD OF.
-
+```
 
 ### Q5
+**Perintah :**
+```
 -- Diminta: menjalankan query agregasi akses berdasarkan bulan dan kanal,
 -- serta mencatat waktu eksekusinya.
 
@@ -161,8 +184,10 @@ SELECT date_trunc('month', a.waktu) AS bulan,
 FROM lab4.jejak_akses a
 GROUP BY 1, 2
 ORDER BY 1, 2;
+```
 
-Keluaran:
+**Keluaran :**
+```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
 $ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q05_query_dasar_akses.sql
 Timing is on.
@@ -223,12 +248,16 @@ Timing is on.
 (52 rows)
 
 Time: 618.533 ms
+```
 
-Alasan:
+**Alasan :**
+```
 Hasil Q5 menghasilkan 52 baris karena data akses tersebar pada 13 bulan kalender dan terdapat 4 kanal akses, sehingga terbentuk 13 × 4 = 52 kombinasi kelompok. Jumlah akses pada setiap kelompok berbeda karena data waktu dan kanal dibuat menggunakan nilai acak. Nilai film_unik hampir selalu mendekati 1.000 karena film_id dihasilkan secara acak pada rentang 1 sampai 1.000 dan jumlah transaksi pada setiap kelompok cukup besar sehingga hampir seluruh film muncul. Jumlah akses pada September 2025 dan September 2026 lebih sedikit karena kedua bulan tersebut hanya terwakili sebagian dalam rentang 365 hari saat data dibuat. Query membutuhkan waktu 618,533 ms pada lingkungan PostgreSQL yang digunakan.
-
+```
 
 ### Q6
+**Perintah :**
+```
 -- Diminta: menjadikan query Q5 sebagai materialized view dengan WITH NO DATA,
 -- membuktikan bahwa matview belum dapat dibaca sebelum refresh, kemudian
 -- melakukan refresh biasa dan mencatat waktunya.
@@ -258,8 +287,10 @@ FROM lab4.ringkasan_akses;
 
 -- Isi materialized view dengan hasil query.
 REFRESH MATERIALIZED VIEW lab4.ringkasan_akses;
+```
 
-Keluaran:
+**Keluaran :**
+```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
 $ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q06_buat_matview.sql
 Timing is on.
@@ -270,12 +301,15 @@ psql:/proc/self/fd/0:26: ERROR:  materialized view "ringkasan_akses" has not bee
 HINT:  Use the REFRESH MATERIALIZED VIEW command.
 REFRESH MATERIALIZED VIEW
 Time: 646.175 ms
+```
 
-Alasan:
+**Alasan :**
 Materialized view lab4.ringkasan_akses berhasil dibuat menggunakan WITH NO DATA. Ketika materialized view tersebut dibaca sebelum dilakukan refresh, PostgreSQL menghasilkan error materialized view "ringkasan_akses" has not been populated. Setelah itu, REFRESH MATERIALIZED VIEW berhasil dijalankan dengan waktu 646.175 ms.
 
 
 ### Q7
+**Perintah :**
+```
 -- Diminta: mencoba refresh materialized view secara concurrent, mencatat
 -- pesan galat, membuat unique index yang mencakup seluruh baris matview,
 -- kemudian mengulangi refresh concurrent dan mencatat waktunya.
@@ -300,8 +334,10 @@ ON lab4.ringkasan_akses (bulan, kanal);
 
 -- Percobaan kedua: refresh concurrent setelah unique index dibuat.
 REFRESH MATERIALIZED VIEW CONCURRENTLY lab4.ringkasan_akses;
+```
 
-Keluaran:
+**Keluaran :**
+```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
 $ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q07_refresh_concurrently.sql
 Timing is on.
@@ -312,12 +348,15 @@ CREATE INDEX
 Time: 4.578 ms
 REFRESH MATERIALIZED VIEW
 Time: 609.347 ms
+```
 
-Alasan:
+**Alasan :**
+```
 Percobaan menunjukkan bahwa REFRESH MATERIALIZED VIEW CONCURRENTLY memiliki persyaratan berupa unique index tanpa klausa WHERE pada materialized view. Percobaan pertama gagal dengan waktu 1.170 ms karena ringkasan_akses belum memiliki unique index. Setelah unique index pada (bulan, kanal) dibuat dengan waktu 4.578 ms, percobaan kedua berhasil melakukan refresh concurrent dengan waktu 609.347 ms. Dengan demikian, unique index diperlukan agar PostgreSQL dapat melakukan pembaruan materialized view secara concurrent.
-
+```
 
 ### Q8
+**Perintah :**
 -- Diminta: membuktikan bahwa REFRESH MATERIALIZED VIEW CONCURRENTLY tidak
 -- memblokir pembaca, kemudian membandingkannya dengan refresh biasa.
 
@@ -351,8 +390,10 @@ REFRESH MATERIALIZED VIEW CONCURRENTLY lab4.ringkasan_akses;
 
 SELECT count(*)
 FROM lab4.ringkasan_akses;
+```
 
-Keluaran:
+**Keluaran :**
+```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p04-sql2)
 $ docker compose exec -T postgres psql -U msbd -d latihan   -f /dev/stdin < latihan/p04/q08_buktikan_pembaca.sql
 INSERT 0 200000
@@ -361,10 +402,11 @@ REFRESH MATERIALIZED VIEW
 -------
     52
 (1 row)
-
+```
 
 ### Q9
-Perintah :
+**Perintah :**
+```
 CREATE OR REPLACE FUNCTION lab4.catat_audit_harga()
 RETURNS trigger AS $$
 BEGIN
@@ -379,26 +421,31 @@ AFTER UPDATE OF rental_rate ON lab4.film
 FOR EACH ROW
 WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate)
 EXECUTE FUNCTION lab4.catat_audit_harga();
+```
 
-Keluaran : 
+**Keluaran :**
+```
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q09_trigger_audit_baris.sql 
 CREATE TABLE 
 CREATE FUNCTION 
 CREATE TRIGGER
+```
 
-Alasan : Perintah ini membangun mekanisme audit trail sederhana. Tabel lab4.audit_harga dibuat untuk menyimpan riwayat perubahan harga, kemudian fungsi lab4.catat_audit_harga() didefinisikan untuk menyisipkan satu baris audit berisi harga lama, harga baru, pelaku, dan waktu perubahan. Trigger film_audit_harga dipasang sebagai AFTER UPDATE OF rental_rate FOR EACH ROW, artinya trigger hanya diperhatikan ketika kolom rental_rate ikut disebut pada klausa SET, dan ditambah klausa WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate) agar baris audit hanya benar-benar dicatat jika nilainya sungguh berubah, bukan sekadar ditulis ulang dengan nilai yang sama.
-
+**Alasan :** 
+Perintah ini membangun mekanisme audit trail sederhana. Tabel lab4.audit_harga dibuat untuk menyimpan riwayat perubahan harga, kemudian fungsi lab4.catat_audit_harga() didefinisikan untuk menyisipkan satu baris audit berisi harga lama, harga baru, pelaku, dan waktu perubahan. Trigger film_audit_harga dipasang sebagai AFTER UPDATE OF rental_rate FOR EACH ROW, artinya trigger hanya diperhatikan ketika kolom rental_rate ikut disebut pada klausa SET, dan ditambah klausa WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate) agar baris audit hanya benar-benar dicatat jika nilainya sungguh berubah, bukan sekadar ditulis ulang dengan nilai yang sama.
 
 ### Q10
-Perintah :
-
+**Perintah :**
+```
 -- 1. Ubah harga sungguhan -> harus tercatat UPDATE lab4.film SET rental_rate = 2.99 WHERE title = 'Film A';
 -- 2. Tulis ulang harga sama persis -> TIDAK tercatat (ditahan WHEN) UPDATE lab4.film SET rental_rate = 2.99 WHERE title = 'Film A';
 -- 3. Ubah title saja -> TIDAK tercatat (trigger tidak fire sama sekali, -- karena rental_rate tidak disebut di SET) UPDATE lab4.film SET title = 'Film A Updated' WHERE title = 'Film A';
 
 SELECT * FROM lab4.audit_harga;
+```
 
-Keluaran : 
+**Keluaran :** 
+```
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q10_uji_audit_baris.sql 
 UPDATE 1 
 UPDATE 1 
@@ -406,12 +453,16 @@ UPDATE 1
 audit_id | film_id | harga_lama | harga_baru | diubah_oleh | diubah_pada 
 ---------+---------+------------+------------+-------------+------------------------------- 
 1        | 1       | 0.99       | 2.99       | msbd        | 2026-09-15 16:21:25.741917+00 (1 row)
+```
 
-Alasan : Ketiga perintah UPDATE sama-sama berhasil mengenai satu baris (UPDATE 1), tetapi tabel audit_harga hanya berisi satu baris riwayat. UPDATE pertama benar-benar mengubah rental_rate dari 0.99 menjadi 2.99 sehingga klausa WHEN bernilai true dan trigger tercatat. UPDATE kedua menuliskan nilai 2.99 yang sama persis dengan nilai sebelumnya, sehingga OLD.rental_rate IS DISTINCT FROM NEW.rental_rate bernilai false dan trigger ditahan (tidak fire). UPDATE ketiga hanya mengubah kolom title, sama sekali tidak menyebut rental_rate pada SET, sehingga trigger AFTER UPDATE OF rental_rate tidak diperhatikan sejak awal. Hal ini membuktikan bahwa kombinasi OF <kolom> dan klausa WHEN efektif menyaring baik dari sisi kolom yang disentuh maupun dari sisi apakah nilainya benar-benar berubah.
-
+**Alasan :**
+``` 
+Ketiga perintah UPDATE sama-sama berhasil mengenai satu baris (UPDATE 1), tetapi tabel audit_harga hanya berisi satu baris riwayat. UPDATE pertama benar-benar mengubah rental_rate dari 0.99 menjadi 2.99 sehingga klausa WHEN bernilai true dan trigger tercatat. UPDATE kedua menuliskan nilai 2.99 yang sama persis dengan nilai sebelumnya, sehingga OLD.rental_rate IS DISTINCT FROM NEW.rental_rate bernilai false dan trigger ditahan (tidak fire). UPDATE ketiga hanya mengubah kolom title, sama sekali tidak menyebut rental_rate pada SET, sehingga trigger AFTER UPDATE OF rental_rate tidak diperhatikan sejak awal. Hal ini membuktikan bahwa kombinasi OF <kolom> dan klausa WHEN efektif menyaring baik dari sisi kolom yang disentuh maupun dari sisi apakah nilainya benar-benar berubah.
+```
 
 ### Q11
-Perintah :
+**Perintah :**
+```
 CREATE OR REPLACE TRIGGER film_audit_harga
 AFTER UPDATE OF rental_rate ON lab4.film
 FOR EACH ROW
@@ -433,8 +484,10 @@ AFTER UPDATE OF rental_rate ON lab4.film
 FOR EACH ROW
 WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate)
 EXECUTE FUNCTION lab4.catat_audit_harga();
+```
 
-Keluaran : 
+**Keluaran :** 
+```
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q11_null_pada_trigger.sql 
 CREATE TRIGGER 
 ALTER TABLE 
@@ -443,19 +496,23 @@ UPDATE 1
 audit_id | film_id | harga_lama | harga_baru | diubah_oleh | diubah_pada 
 ---------+---------+------------+------------+-------------+------------------------------- 
 1        | 1       | 0.99       | 2.99       | msbd        | 2026-09-15 16:21:25.741917+00 (1 row) ALTER TABLE CREATE TRIGGER
+```
 
-Alasan : Trigger sengaja diganti agar klausa WHEN memakai operator <> alih-alih IS DISTINCT FROM. Kedua UPDATE (biasa -> NULL dan NULL -> biasa) sama-sama berhasil (UPDATE 1), namun tabel audit_harga tetap hanya menampilkan satu baris lama dari Q10, tidak bertambah sama sekali. Ini terjadi karena operator perbandingan biasa (<>) menghasilkan NULL, bukan true atau false, setiap kali salah satu operand bernilai NULL, dan PostgreSQL memperlakukan WHEN yang bernilai NULL sama seperti false sehingga trigger tidak pernah fire pada kedua transisi tersebut. Kemampuan yang tidak dimiliki operator <> inilah yang membuat perubahan menjadi NULL atau dari NULL berpotensi lolos tanpa tercatat pada mekanisme audit; IS DISTINCT FROM diperlukan justru karena ia memperlakukan NULL sebagai nilai yang bisa dibandingkan secara aman. Setelah pembuktian ini, kolom rental_rate dikembalikan menjadi NOT NULL dan trigger dikembalikan ke versi IS DISTINCT FROM supaya Q12-Q13 berjalan pada kondisi yang aman.
-
+**Alasan :** 
+Trigger sengaja diganti agar klausa WHEN memakai operator <> alih-alih IS DISTINCT FROM. Kedua UPDATE (biasa -> NULL dan NULL -> biasa) sama-sama berhasil (UPDATE 1), namun tabel audit_harga tetap hanya menampilkan satu baris lama dari Q10, tidak bertambah sama sekali. Ini terjadi karena operator perbandingan biasa (<>) menghasilkan NULL, bukan true atau false, setiap kali salah satu operand bernilai NULL, dan PostgreSQL memperlakukan WHEN yang bernilai NULL sama seperti false sehingga trigger tidak pernah fire pada kedua transisi tersebut. Kemampuan yang tidak dimiliki operator <> inilah yang membuat perubahan menjadi NULL atau dari NULL berpotensi lolos tanpa tercatat pada mekanisme audit; IS DISTINCT FROM diperlukan justru karena ia memperlakukan NULL sebagai nilai yang bisa dibandingkan secara aman. Setelah pembuktian ini, kolom rental_rate dikembalikan menjadi NOT NULL dan trigger dikembalikan ke versi IS DISTINCT FROM supaya Q12-Q13 berjalan pada kondisi yang aman.
 
 ### Q12
-Perintah :
+**Perintah :**
+```
 \timing on 
 UPDATE lab4.film SET rental_rate = rental_rate + 0.01; 
 ALTER TABLE lab4.film DISABLE TRIGGER film_audit_harga; 
 UPDATE lab4.film SET rental_rate = rental_rate + 0.01; 
 ALTER TABLE lab4.film ENABLE TRIGGER film_audit_harga;
+```
 
-Keluaran : 
+**Keluaran :** 
+```
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q12_biaya_trigger_baris.sql 
 Timing is on. 
 UPDATE 3 
@@ -466,12 +523,16 @@ UPDATE 3
 Time: 4.859 ms 
 ALTER TABLE 
 Time: 5.927 ms
+```
 
-Alasan : UPDATE pertama dijalankan dengan trigger film_audit_harga masih aktif dan memakan waktu 7.501 ms untuk memperbarui 3 baris, karena setiap baris yang berubah memicu satu eksekusi fungsi trigger dan satu INSERT tambahan ke tabel audit_harga. Setelah trigger dinonaktifkan (DISABLE TRIGGER), UPDATE kedua terhadap 3 baris yang sama hanya memakan waktu 4.859 ms, lebih cepat karena tidak ada lagi biaya tambahan berupa pemanggilan fungsi PL/pgSQL dan penulisan baris audit per baris data. Meski selisihnya masih kecil karena tabel film hanya berisi sedikit baris, prinsipnya tetap terlihat: trigger FOR EACH ROW menambah biaya yang berbanding lurus dengan jumlah baris yang terkena UPDATE, sehingga pada tabel besar biaya tambahan ini akan jauh lebih terasa.
-
+**Alasan :**
+```
+UPDATE pertama dijalankan dengan trigger film_audit_harga masih aktif dan memakan waktu 7.501 ms untuk memperbarui 3 baris, karena setiap baris yang berubah memicu satu eksekusi fungsi trigger dan satu INSERT tambahan ke tabel audit_harga. Setelah trigger dinonaktifkan (DISABLE TRIGGER), UPDATE kedua terhadap 3 baris yang sama hanya memakan waktu 4.859 ms, lebih cepat karena tidak ada lagi biaya tambahan berupa pemanggilan fungsi PL/pgSQL dan penulisan baris audit per baris data. Meski selisihnya masih kecil karena tabel film hanya berisi sedikit baris, prinsipnya tetap terlihat: trigger FOR EACH ROW menambah biaya yang berbanding lurus dengan jumlah baris yang terkena UPDATE, sehingga pada tabel besar biaya tambahan ini akan jauh lebih terasa.
+```
 
 ### Q13
-Perintah :
+**Perintah :**
+```
 CREATE OR REPLACE FUNCTION lab4.catat_audit_massal()
 RETURNS trigger AS $$
 BEGIN
@@ -495,8 +556,10 @@ ALTER TABLE lab4.film DISABLE TRIGGER film_audit_harga;
 
 \timing on
 UPDATE lab4.film SET rental_rate = rental_rate + 0.01;
+```
 
-Keluaran : 
+**Keluaran :** 
+```
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q13_trigger_pernyataan.sql 
 CREATE FUNCTION 
 CREATE TRIGGER 
@@ -504,33 +567,39 @@ ALTER TABLE
 Timing is on. 
 UPDATE 3 
 Time: 9.573 ms
+```
 
-Alasan : Trigger film_audit_harga_massal didefinisikan sebagai FOR EACH STATEMENT dengan REFERENCING OLD TABLE AS lama NEW TABLE AS baru, artinya trigger ini hanya fire satu kali per pernyataan UPDATE, terlepas dari berapa banyak baris yang terkena dampak, dan mengakses seluruh baris lama maupun baru sekaligus melalui transition table lama dan baru. Fungsi kemudian menyisipkan baris audit hanya untuk baris yang harga_lama-nya benar-benar berbeda dari harga_baru menggunakan satu perintah INSERT ... SELECT ... JOIN. Trigger per-baris dimatikan lebih dulu agar perbandingan adil. Pada percobaan ini UPDATE 3 baris memakan waktu 9.573 ms, sedikit lebih lambat dibanding UPDATE tanpa trigger sama sekali pada Q12 (4.859 ms) karena tetap ada biaya membangun transition table dan menjalankan INSERT...SELECT satu kali. Pada tabel sekecil ini biaya tetap (fixed cost) trigger pernyataan belum terlihat menguntungkan; keunggulannya baru signifikan pada UPDATE massal beribu-ribu baris, karena trigger pernyataan hanya melakukan satu kali INSERT...SELECT alih-alih ribuan INSERT satu per satu seperti pada trigger per-baris.
-
+**Alasan :** 
+```
+Trigger film_audit_harga_massal didefinisikan sebagai FOR EACH STATEMENT dengan REFERENCING OLD TABLE AS lama NEW TABLE AS baru, artinya trigger ini hanya fire satu kali per pernyataan UPDATE, terlepas dari berapa banyak baris yang terkena dampak, dan mengakses seluruh baris lama maupun baru sekaligus melalui transition table lama dan baru. Fungsi kemudian menyisipkan baris audit hanya untuk baris yang harga_lama-nya benar-benar berbeda dari harga_baru menggunakan satu perintah INSERT ... SELECT ... JOIN. Trigger per-baris dimatikan lebih dulu agar perbandingan adil. Pada percobaan ini UPDATE 3 baris memakan waktu 9.573 ms, sedikit lebih lambat dibanding UPDATE tanpa trigger sama sekali pada Q12 (4.859 ms) karena tetap ada biaya membangun transition table dan menjalankan INSERT...SELECT satu kali. Pada tabel sekecil ini biaya tetap (fixed cost) trigger pernyataan belum terlihat menguntungkan; keunggulannya baru signifikan pada UPDATE massal beribu-ribu baris, karena trigger pernyataan hanya melakukan satu kali INSERT...SELECT alih-alih ribuan INSERT satu per satu seperti pada trigger per-baris.
+```
 
 ### Q14
-Perintah :
+**Perintah :**
+```
 -- Masukkan data rusak dulu, biar kontrasnya kelihatan INSERT INTO lab4.film (title, rental_rate, rating) VALUES ('Film Rusak Q14', -5.00, 'PG');
-
 -- Tahap 1: tambahkan aturan tanpa validasi data lama (cepat, tidak lock lama) ALTER TABLE lab4.film ADD CONSTRAINT film_rental_rate_non_negatif CHECK (rental_rate >= 0) NOT VALID; -- ^ ini BERHASIL walau ada baris negatif, karena NOT VALID cuma menjaga baris baru
-
 -- Buktikan validasi eksplisit gagal ALTER TABLE lab4.film VALIDATE CONSTRAINT film_rental_rate_non_negatif; -- ERROR: check constraint ... is violated by some row
-
 -- Perbaiki datanya UPDATE lab4.film SET rental_rate = 5.00 WHERE title = 'Film Rusak Q14';
-
 -- Ulangi validasi -> sekarang sukses ALTER TABLE lab4.film VALIDATE CONSTRAINT film_rental_rate_non_negatif;
 
-Keluaran : 
+**Keluaran :**
+```
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q14_check_not_valid.sql 
 INSERT 0 1 
 ALTER TABLE ERROR: check constraint "film_rental_rate_non_negatif" of relation "film" is violated by some row 
 UPDATE 1 
 ALTER TABLE
+```
 
-Alasan : Baris dengan rental_rate negatif (-5.00) sengaja disisipkan lebih dulu agar kontrasnya terlihat. Penambahan CHECK ... NOT VALID tetap berhasil (ALTER TABLE) meskipun sudah ada baris yang melanggar, karena NOT VALID membuat PostgreSQL hanya menerapkan aturan tersebut pada baris baru atau baris yang diubah setelahnya, tanpa memindai dan mengunci seluruh tabel untuk memvalidasi data lama. Ketika validasi eksplisit dijalankan lewat VALIDATE CONSTRAINT, PostgreSQL baru memindai seluruh baris dan menemukan pelanggaran pada Film Rusak Q14 sehingga muncul galat. Setelah data diperbaiki menjadi 5.00, VALIDATE CONSTRAINT diulang dan berhasil tanpa galat. Pola dua tahap (ADD ... NOT VALID lalu VALIDATE CONSTRAINT) ini penting pada tabel produksi berukuran besar karena menghindari lock panjang yang biasanya terjadi bila validasi data lama dan pemasangan aturan dilakukan sekaligus dalam satu perintah ALTER TABLE.
-
+**Alasan :**
+```
+Baris dengan rental_rate negatif (-5.00) sengaja disisipkan lebih dulu agar kontrasnya terlihat. Penambahan CHECK ... NOT VALID tetap berhasil (ALTER TABLE) meskipun sudah ada baris yang melanggar, karena NOT VALID membuat PostgreSQL hanya menerapkan aturan tersebut pada baris baru atau baris yang diubah setelahnya, tanpa memindai dan mengunci seluruh tabel untuk memvalidasi data lama. Ketika validasi eksplisit dijalankan lewat VALIDATE CONSTRAINT, PostgreSQL baru memindai seluruh baris dan menemukan pelanggaran pada Film Rusak Q14 sehingga muncul galat. Setelah data diperbaiki menjadi 5.00, VALIDATE CONSTRAINT diulang dan berhasil tanpa galat. Pola dua tahap (ADD ... NOT VALID lalu VALIDATE CONSTRAINT) ini penting pada tabel produksi berukuran besar karena menghindari lock panjang yang biasanya terjadi bila validasi data lama dan pemasangan aturan dilakukan sekaligus dalam satu perintah ALTER TABLE.
+**
 
 ### Q15
+**Perintah :**
+```
 ALTER TABLE lab4.film ADD COLUMN deleted_at timestamptz; ALTER TABLE lab4.film ADD CONSTRAINT film_judul_unik UNIQUE (title);
 
 -- Buktikan masalahnya UPDATE lab4.film SET deleted_at = now() WHERE title = 'Film A'; INSERT INTO lab4.film (title, rental_rate, rating) VALUES ('Film A', 3.99, 'PG'); -- ERROR: duplicate key value violates unique constraint "film_judul_unik" -- (padahal 'Film A' yang lama sudah soft-delete, seharusnya boleh daftar ulang)
@@ -540,8 +609,10 @@ ALTER TABLE lab4.film ADD COLUMN deleted_at timestamptz; ALTER TABLE lab4.film A
 CREATE UNIQUE INDEX ux_film_judul_aktif ON lab4.film (title) WHERE deleted_at IS NULL;
 
 -- Ulangi insert yang sama -> sekarang berhasil, karena baris lama sudah "tidak aktif" INSERT INTO lab4.film (title, rental_rate, rating) VALUES ('Film A', 3.99, 'PG');
+```
 
-Keluaran : 
+**Keluaran :** 
+```
 $ docker exec -i msbd-pg psql -U msbd -d latihan < latihan/p04/q15_unique_soft_delete.sql 
 ALTER TABLE 
 ALTER TABLE 
@@ -550,236 +621,156 @@ INSERT 0 1
 ALTER TABLE 
 CREATE INDEX 
 ERROR: duplicate key value violates unique constraint "ux_film_judul_aktif" DETAIL: Key (title)=(Film A) already exists.
+```
 
-Alasan : Kolom deleted_at dan constraint UNIQUE biasa pada title dipasang lebih dulu. Perintah UPDATE ... WHERE title = 'Film A' menghasilkan UPDATE 0 karena pada tahap ini baris berjudul 'Film A' sudah berganti nama menjadi 'Film A Updated' sejak Q10, sehingga tidak ada baris yang cocok untuk di-soft-delete. INSERT berikutnya dengan judul 'Film A' pun berhasil (INSERT 0 1) karena nama tersebut memang belum dipakai baris aktif mana pun. Setelah itu constraint UNIQUE biasa diganti dengan unique index parsial ux_film_judul_aktif yang hanya menegakkan keunikan title pada baris dengan deleted_at IS NULL (baris aktif). Ketika perintah INSERT dengan judul 'Film A' yang sama diulang sekali lagi, muncul galat duplicate key karena baris 'Film A' hasil INSERT sebelumnya masih berstatus aktif (deleted_at IS NULL). Hasil ini tetap membuktikan cara kerja index parsial dengan benar: ia hanya melarang duplikasi antar baris yang sama-sama aktif, dan akan membiarkan sebuah judul dipakai ulang apabila baris lama dengan judul tersebut sudah memiliki deleted_at terisi (soft-deleted), sesuatu yang tidak mungkin dicapai oleh constraint UNIQUE biasa karena UNIQUE biasa tidak mengenal konsep "aktif" atau "tidak aktif" pada datanya.
-
+**Alasan :** 
+```
+Kolom deleted_at dan constraint UNIQUE biasa pada title dipasang lebih dulu. Perintah UPDATE ... WHERE title = 'Film A' menghasilkan UPDATE 0 karena pada tahap ini baris berjudul 'Film A' sudah berganti nama menjadi 'Film A Updated' sejak Q10, sehingga tidak ada baris yang cocok untuk di-soft-delete. INSERT berikutnya dengan judul 'Film A' pun berhasil (INSERT 0 1) karena nama tersebut memang belum dipakai baris aktif mana pun. Setelah itu constraint UNIQUE biasa diganti dengan unique index parsial ux_film_judul_aktif yang hanya menegakkan keunikan title pada baris dengan deleted_at IS NULL (baris aktif). Ketika perintah INSERT dengan judul 'Film A' yang sama diulang sekali lagi, muncul galat duplicate key karena baris 'Film A' hasil INSERT sebelumnya masih berstatus aktif (deleted_at IS NULL). Hasil ini tetap membuktikan cara kerja index parsial dengan benar: ia hanya melarang duplikasi antar baris yang sama-sama aktif, dan akan membiarkan sebuah judul dipakai ulang apabila baris lama dengan judul tersebut sudah memiliki deleted_at terisi (soft-deleted), sesuatu yang tidak mungkin dicapai oleh constraint UNIQUE biasa karena UNIQUE biasa tidak mengenal konsep "aktif" atau "tidak aktif" pada datanya.
+```
 
 ### Q16
 #### 1. NO ACTION
-Perintah:
-CREATE TABLE lab4.ulasan_no_action (
-    ulasan_id bigserial PRIMARY KEY,
-    film_id integer NOT NULL,
-    isi_ulasan text,
-    CONSTRAINT fk_ulasan_film_no_action
-        FOREIGN KEY (film_id)
-        REFERENCES lab4.film (film_id)
-        ON DELETE NO ACTION
-);
+**Perintah :**
+```
+docker compose exec -T postgres psql -U msbd -d latihan -f /dev/stdin < latihan/p04/q16_fk_aksi_referensial.sql
+```
 
-INSERT INTO lab4.ulasan_no_action (film_id, isi_ulasan)
-VALUES (1, 'Film bagus');
-
-DELETE FROM lab4.film
-WHERE film_id = 1;
-
-Keluaran:
+#### 1. NO ACTION
+**Keluaran :**
+```
+SET
+DROP TABLE
+CREATE TABLE
 INSERT 0 1
-ERROR: update or delete on table "film" violates foreign key constraint
-"fk_ulasan_film_no_action" on table "ulasan_no_action"
-DETAIL: Key (film_id)=(1) is still referenced from table "ulasan_no_action".
+psql:/proc/self/fd/0:28: ERROR:  update or delete on table "film" violates foreign key constraint "harga_film_film_id_fkey" on table "harga_film"
+DETAIL:  Key (film_id)=(1) is still referenced from table "harga_film".
+```
 
-Alasan:
-Penghapusan film ditolak karena film_id = 1 masih digunakan oleh tabel ulasan_no_action. Pada NO ACTION, data induk tidak dapat dihapus apabila masih terdapat data anak yang mereferensikannya.
+```Alasan :```
+NO ACTION mencegah penghapusan Film 1 karena masih terdapat data yang mereferensikan film tersebut melalui foreign key.
+```
 
 #### 2. CASCADE
-Perintah:
-CREATE TABLE lab4.ulasan_cascade (
-    ulasan_id bigserial PRIMARY KEY,
-    film_id integer NOT NULL,
-    isi_ulasan text,
-    CONSTRAINT fk_ulasan_film_cascade
-        FOREIGN KEY (film_id)
-        REFERENCES lab4.film (film_id)
-        ON DELETE CASCADE
-);
-
-INSERT INTO lab4.ulasan_cascade (film_id, isi_ulasan)
-VALUES (2, 'Film sangat menarik');
-
-SELECT *
-FROM lab4.ulasan_cascade
-WHERE film_id = 2;
-
-DELETE FROM lab4.film
-WHERE film_id = 2;
-
-SELECT *
-FROM lab4.ulasan_cascade
-WHERE film_id = 2;
-
-Keluaran:
+**Keluaran :**
+```
+DROP TABLE
+CREATE TABLE
 INSERT 0 1
-
-ulasan_id | film_id |     isi_ulasan
+ ulasan_id | film_id |     isi_ulasan      
 -----------+---------+---------------------
-1          | 2       | Film sangat menarik
+         1 |       2 | Film sangat menarik
+(1 row)
 
 DELETE 1
-
-ulasan_id | film_id | isi_ulasan
------------+----------+------------
+ ulasan_id | film_id | isi_ulasan 
+-----------+---------+------------
 (0 rows)
+```
 
-Alasan:
-Ketika film_id = 2 dihapus dari tabel film, data ulasan yang memiliki film_id = 2 juga otomatis dihapus. Hal tersebut menunjukkan bahwa ON DELETE CASCADE meneruskan penghapusan dari tabel induk ke tabel anak.
+**Alasan :**
+``
+CASCADE menyebabkan data ulasan yang terkait dengan Film 2 ikut terhapus secara otomatis ketika Film 2 dihapus.
+``
 
 #### 3. SET NULL
-Perintah:
-CREATE TABLE lab4.ulasan_set_null (
-    ulasan_id bigserial PRIMARY KEY,
-    film_id integer,
-    isi_ulasan text,
-    CONSTRAINT fk_ulasan_film_set_null
-        FOREIGN KEY (film_id)
-        REFERENCES lab4.film (film_id)
-        ON DELETE SET NULL
-);
-
-INSERT INTO lab4.ulasan_set_null (film_id, isi_ulasan)
-VALUES (3, 'Film cukup bagus');
-
-SELECT *
-FROM lab4.ulasan_set_null
-WHERE film_id = 3;
-
-DELETE FROM lab4.film
-WHERE film_id = 3;
-
-SELECT *
-FROM lab4.ulasan_set_null
-WHERE ulasan_id = 1;
-
-Keluaran:
-
+**Keluaran :**
+```
+DROP TABLE
+CREATE TABLE
 INSERT 0 1
-
-ulasan_id | film_id |    isi_ulasan
+ ulasan_id | film_id |    isi_ulasan    
 -----------+---------+------------------
-1          | 3       | Film cukup bagus
+         1 |       3 | Film cukup bagus
+(1 row)
 
 DELETE 1
+ ulasan_id | film_id |    isi_ulasan    
+-----------+---------+------------------
+         1 |         | Film cukup bagus
+(1 row)
+```
 
-ulasan_id | film_id |    isi_ulasan
------------+----------+------------------
-1          | NULL    | Film cukup bagus
-
-Alasan:
-Data film berhasil dihapus, tetapi data ulasan tetap dipertahankan. Nilai film_id pada ulasan berubah menjadi NULL. Hal ini menunjukkan bahwa ON DELETE SET NULL memutus hubungan dengan data induk tanpa menghapus data anak.
+**Alasan :**
+```
+SET NULL mempertahankan data ulasan setelah Film 3 dihapus, tetapi nilai film_id pada ulasan diubah menjadi NULL.
+```
 
 ### Q17 
-Membuat tabel harga film
+**Perintah :**
+```
+docker compose exec -T postgres psql -U msbd -d latihan -f /dev/stdin < latihan/p04/q17_exclude_harga.sql
+```
 
-Perintah:
-CREATE EXTENSION IF NOT EXISTS btree_gist;
-
-CREATE TABLE lab4.harga_film (
-    harga_film_id bigserial PRIMARY KEY,
-    film_id integer NOT NULL REFERENCES lab4.film (film_id),
-    wilayah text NOT NULL,
-    harga numeric(5,2) NOT NULL CHECK (harga >= 0),
-    berlaku daterange NOT NULL,
-    CONSTRAINT exclude_harga_film
-        EXCLUDE USING gist (
-            film_id WITH =,
-            wilayah WITH =,
-            berlaku WITH &&
-        )
-);
-
-Keluaran:
+#### Pembuatan tabel dan INSERT pertama
+**Keluaran :**
+```
+SET
 CREATE EXTENSION
+psql:/proc/self/fd/0:7: NOTICE:  extension "btree_gist" already exists, skipping
+DROP TABLE
 CREATE TABLE
-
-Alasan:
-Extension btree_gist digunakan agar operator = dapat digunakan pada kolom dalam constraint EXCLUDE. Constraint tersebut memastikan kombinasi film_id, wilayah, dan periode berlaku tidak memiliki periode yang saling tumpang tindih.
-
-INSERT diterima
-
-Perintah:
-INSERT INTO lab4.harga_film
-    (film_id, wilayah, harga, berlaku)
-VALUES
-    (1, 'Indonesia', 25.00, '[2026-01-01,2026-04-01)');
-
-Keluaran:
 INSERT 0 1
+ harga_film_id | film_id | wilayah | harga |         berlaku         
+---------------+---------+---------+-------+-------------------------
+             1 |       1 | ID      | 50.00 | [2026-01-01,2026-04-01)
+(1 row)
+```
 
-Alasan:
-Data berhasil dimasukkan karena belum terdapat data dengan film dan wilayah yang sama pada periode yang tumpang tindih.
+**Alasan :**
+```
+Extension btree_gist digunakan untuk mendukung operator yang diperlukan oleh EXCLUDE USING gist. Setelah tabel harga_film dibuat, INSERT pertama berhasil karena periode 2026-01-01 sampai 2026-04-01 belum memiliki data yang tumpang tindih untuk film dan wilayah yang sama.
+```
 
-INSERT ditolak
+#### INSERT kedua
+***Keluaran :***
+```
+ERROR:  conflicting key value violates exclusion constraint "harga_film_film_id_wilayah_berlaku_excl"
+DETAIL:  Key (film_id, wilayah, berlaku)=(1, ID, [2026-03-01,2026-06-01)) conflicts with existing key (film_id, wilayah, berlaku)=(1, ID, [2026-01-01,2026-04-01)).
+```
+
+**Alasan :**
+```
+INSERT kedua ditolak karena memiliki film_id dan wilayah yang sama dengan data sebelumnya, sementara periode [2026-03-01,2026-06-01) tumpang tindih dengan [2026-01-01,2026-04-01). Constraint EXCLUDE mencegah kondisi tersebut.
+```
 
 ### Q18
-Perintah:
-INSERT INTO lab4.harga_film
-    (film_id, wilayah, harga, berlaku)
-VALUES
-    (1, 'Indonesia', 30.00, '[2026-03-01,2026-06-01)');
+**Perintah :**
+```
+docker compose exec -T postgres psql -U msbd -d latihan -f /dev/stdin < latihan/p04/q18_expand_tulis_ganda.sql
+```
 
-Keluaran:
-ERROR: conflicting key value violates exclusion constraint
-"exclude_harga_film"
-
-Alasan:
-INSERT ditolak karena film_id = 1 dan wilayah Indonesia sama dengan data sebelumnya, sementara periode 2026-03-01 sampai 2026-06-01 tumpang tindih dengan periode 2026-01-01 sampai 2026-04-01.
-
-
-Perintah:
-
--- Membuat tabel harga_film sebagai struktur baru
-CREATE TABLE lab4.harga_film (
-    harga_film_id bigserial PRIMARY KEY,
-    film_id integer NOT NULL REFERENCES lab4.film(film_id),
-    wilayah text NOT NULL,
-    harga numeric(5,2) NOT NULL CHECK (harga >= 0),
-    berlaku daterange NOT NULL
-);
-
--- Memasukkan harga awal dari rental_rate
-INSERT INTO lab4.harga_film (film_id, wilayah, harga, berlaku)
-SELECT film_id, 'GLOBAL', rental_rate, daterange(CURRENT_DATE, NULL, '[)')
-FROM lab4.film;
-
--- Membuat fungsi untuk tulis ganda
-CREATE OR REPLACE FUNCTION lab4.sinkron_harga_film()
-RETURNS trigger AS $$
-BEGIN
-    INSERT INTO lab4.harga_film (film_id, wilayah, harga, berlaku)
-    VALUES (NEW.film_id, 'GLOBAL', NEW.rental_rate, daterange(CURRENT_DATE, NULL, '[)'));
-    RETURN NEW;
-END;
-$$ LANGUAGE plpgsql;
-
--- Memasang trigger pada tabel lama
-CREATE TRIGGER film_tulis_ganda
-AFTER UPDATE OF rental_rate ON lab4.film
-FOR EACH ROW
-WHEN (OLD.rental_rate IS DISTINCT FROM NEW.rental_rate)
-EXECUTE FUNCTION lab4.sinkron_harga_film();
-
-Keluaran:
-
+**Keluaran :**
+```
+SET
 CREATE TABLE
-INSERT 0 3
+psql:/proc/self/fd/0:23: NOTICE:  relation "harga_film" already exists, skipping
 CREATE FUNCTION
+DROP TRIGGER
 CREATE TRIGGER
+```
 
-Jumlah 3 menyesuaikan jumlah data pada lab4.film yang kamu punya. Kalau jumlah datanya berbeda, angka pada INSERT juga akan berbeda.
-
-Alasan:
-Fase expand dilakukan dengan membuat tabel lab4.harga_film sebagai struktur baru tanpa menghapus rental_rate pada tabel lama. Data harga awal dipindahkan ke tabel baru, kemudian trigger tulis ganda dipasang agar perubahan rental_rate pada tabel lama juga tercatat di harga_film. Dengan begitu, pembaca lama tetap dapat menggunakan lab4.film, sementara struktur baru mulai menerima d
+**Alasan :**
+```
+SET
+CREATE TABLE
+psql:/proc/self/fd/0:23: NOTICE:  relation "harga_film" already exists, skipping
+CREATE FUNCTION
+DROP TRIGGER
+CREATE TRIGGER
+```
 
 ### Q19
-Perintah :
-
+**Perintah :**
+```
 -- Diminta: melakukan backfill lab4.harga_film dari lab4.film.rental_rate dalam potongan 1000 film, lalu menjalankan verifikasi yang harus menghasilkan nol.
 -- Dipilih: DO-block dengan loop batch 1000 dan NOT EXISTS yang memeriksa periode 'ID' yang sedang berlaku (berlaku @> CURRENT_DATE), bukan sekadar "pernah ada baris ID".
 -- Alternatif: NOT EXISTS tanpa syarat periode aktif; tidak dipilih (lihat catatan bug di bawah).
 
 [isi lengkap query sama seperti file q19_backfill_bertahap.sql]
+```
 
-Keluaran :
+**Keluaran :**
+```
 $ docker compose exec -T postgres psql -U msbd -d pagila < latihan/p04/q19_backfill_bertahap.sql
 NOTICE:  Backfill film 1 sampai 1000 selesai
 INSERT 0 0
@@ -787,18 +778,23 @@ INSERT 0 0
 --------------------
                   0
 (1 row)
+```
 
-Alasan :
+**Alasan :**
+```
 Verifikasi menghasilkan 0, menandakan seluruh film memiliki harga wilayah 'ID' yang sedang berlaku hari ini.
 
 Catatan bug yang ditemukan dan diperbaiki: versi awal query ini hanya memeriksa "apakah film pernah punya baris wilayah ID", tanpa memeriksa apakah periodenya masih berlaku. Akibatnya, Film A (yang punya entri harga demo dari Q17 dengan periode sudah kedaluwarsa, berakhir 2026-04-01) dianggap sudah lengkap dan dilewati oleh backfill, padahal tidak punya harga yang aktif hari ini. Bug ini baru terlihat setelah kolom rental_rate lama di-drop pada Q20 -- Film A menampilkan rental_rate = NULL karena tidak ada baris harga_film yang berlaku untuk dijadikan sumber nilai. Perbaikan dilakukan dengan menambahkan syarat berlaku @> CURRENT_DATE pada kondisi NOT EXISTS, baik pada INSERT maupun query verifikasi.
+```
 
 ### Q20
-Perintah :
-
+**Perintah :**
+```
 [isi lengkap query sama seperti file q20_contract_view_fasad.sql final]
+```
 
-Keluaran :
+**Keluaran :**
+```
 $ docker compose exec -T postgres psql -U msbd -d pagila < latihan/p04/q20_contract_view_fasad.sql
 SET
 DROP TRIGGER
@@ -822,9 +818,12 @@ $ docker compose exec postgres psql -U msbd -d pagila -c "SELECT title, rental_r
  Film B |        4.99
  Film C |        0.50
 (3 rows)
+```
 
-Alasan :
+**Alasan :**
+```
 Rename tabel dan pembuatan view fasad dibungkus dalam satu transaksi (BEGIN...COMMIT), sehingga nama lab4.film tidak pernah hilang dari sudut pandang sesi lain -- sesi pembaca lama pada terminal kedua tetap berhasil membaca title dan rental_rate tanpa error, baik sebelum maupun sesudah kolom rental_rate asli dihapus dari lab4.film_base. Percobaan pertama sempat gagal karena view fasad mencantumkan kolom original_language_id, special_features, dan fulltext yang ternyata tidak ada pada skema lab4.film (kolom tersebut hanya ada pada tabel public.film Pagila asli, bukan pada tabel kustom lab4.film yang dibuat q00_setup.sql). Setelah kolom yang tidak valid tersebut dihapus dari definisi view, perintah berjalan sukses.
+```
 
 ### Q21
 Enam tahap Expand–Contract direpresentasikan sebagai enam migration berversi:
