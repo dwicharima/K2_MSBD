@@ -1,3 +1,10 @@
+# tambahan sebelum jalan in ini pertama buat ini dulu
+#python -m venv .venv
+#source .venv/Scripts/activate
+#pip install "psycopg[binary]" psycopg_pool
+
+
+
 import time
 import psycopg
 from psycopg import sql
