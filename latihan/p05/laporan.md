@@ -164,50 +164,231 @@ PostgreSQL melarang adanya perintah COMMIT atau ROLLBACK di dalam prosedur PL/pg
 
 ### Q5
 
--- Diminta: menambahkan EXCEPTION WHEN foreign_key_violation dengan pesan
---         yang lebih ramah ketika terjadi pelanggaran foreign key.
---
--- Dipilih: blok BEGIN ... EXCEPTION untuk menangkap kesalahan foreign key
---         dan menampilkan pesan yang mudah dipahami tanpa menampilkan
---         pesan error teknis secara langsung kepada pengguna.
---
--- Alternatif: membiarkan PostgreSQL menampilkan error bawaan; tidak dipilih
---             karena pesan tersebut lebih teknis dan kurang informatif
---             bagi pengguna aplikasi.
+** Perintah : **
+-- Diminta: Menangkap galat foreign_key_violation dan memberikan pesan ramah.
+-- Dipilih: Blok EXCEPTION WHEN foreign_key_violation di dalam PL/pgSQL.
+-- Alternatif: Validasi manual SELECT COUNT(*) sebelum INSERT; tidak dipilih karena memicu race condition.
 
-DO $$
+CREATE OR REPLACE PROCEDURE lab5.process_rental_safe(
+  p_customer_id integer,
+  p_inventory_id integer,
+  p_staff_id integer,
+  p_amount numeric
+)
+LANGUAGE plpgsql AS $$
+DECLARE
+  v_rental_id bigint;
 BEGIN
-    INSERT INTO lab4.harga_film (
-        film_id,
-        wilayah,
-        harga,
-        berlaku
-    )
-    VALUES (
-        99999,
-        'ID',
-        10.00,
-        daterange('2026-01-01', NULL)
-    );
+  -- Insert ke rental_tx
+  INSERT INTO lab5.rental_tx (customer_id, inventory_id, staff_id)
+  VALUES (p_customer_id, p_inventory_id, p_staff_id)
+  RETURNING rental_id INTO v_rental_id;
 
-    RAISE NOTICE 'Data harga film berhasil ditambahkan.';
+  -- Insert ke payment_tx
+  INSERT INTO lab5.payment_tx (rental_id, amount)
+  VALUES (v_rental_id, p_amount);
 
 EXCEPTION
-    WHEN foreign_key_violation THEN
-        RAISE NOTICE
-            'Data gagal disimpan: film yang dipilih tidak ditemukan. '
-            'Silakan gunakan film_id yang valid.';
+  WHEN foreign_key_violation THEN
+    RAISE EXCEPTION 'Gagal memproses penyewaan: Pelanggan, inventaris, atau staf tidak ditemukan.'
+      USING HINT = 'Pastikan customer_id, inventory_id, dan staff_id yang dimasukkan valid.',
+            ERRCODE = 'foreign_key_violation';
 END;
 $$;
 
+** Keluaran : **
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
+$ python -c "
+import psycopg
+conn = psycopg.connect('postgresql://msbd:msbd2026@localhost:5432/pagila')
+cur = conn.cursor()
+
+cur.execute(open('latihan/p05/q05_exception_fk.sql', 'r', encoding='utf-8').read())
+conn.commit()
+
+try:
+    cur.execute('CALL lab5.process_rental_safe(99999, 1, 1, 15.00);')
+    conn.commit()
+except psycopg.Error as e:
+    print('ERROR:', e)
+    print('SQLSTATE:', e.sqlstate)
+"
+ERROR: Gagal memproses penyewaan: Pelanggan, inventaris, atau staf tidak ditemukan.
+HINT: Pastikan customer_id, inventory_id, dan staff_id yang dimasukkan valid.
+
+SQLSTATE: 23503
+
+** Alasan : **
+Saat customer_id bernilai 99999 dimasukkan, PostgreSQL mendeteksi bahwa ID tersebut tidak ada pada tabel acuan (public.customer). Blok EXCEPTION WHEN foreign_key_violation memotong galat mentah bawaan (default constraints error) dan menghentikan transaksi, lalu menggantikannya dengan pesan kustom melalui RAISE EXCEPTION. Tipe galatnya tetap berada di kelas foreign_key_violation sehingga SQLSTATE yang diterima oleh psycopg tetap bernilai 23503.
+
+
+### Q6
+
+** Perintah : **
+-- Diminta: memasukkan nilai nol dan negatif ke lab5.payment_tx untuk menguji domain positive_amount.
+-- Dipilih: dua statement INSERT terpisah untuk merekam galat masing-masing batas nilai secara presisi.
+-- Alternatif: satu INSERT dengan multiple values; tidak dipilih karena eksekusi terhenti pada galat pertama.
+
+-- 1. Uji nilai nol (0.00)
+INSERT INTO lab5.payment_tx (rental_id, amount) 
+VALUES (1, 0.00);
+
+-- Galat yang dihasilkan:
+-- ERROR:  value for domain lab5.positive_amount violates check constraint "positive_amount_check"
+-- SQLSTATE: 23514
+
+-- 2. Uji nilai negatif (-15.50)
+INSERT INTO lab5.payment_tx (rental_id, amount) 
+VALUES (1, -15.50);
+
+-- Galat yang dihasilkan:
+-- ERROR:  value for domain lab5.positive_amount violates check constraint "positive_amount_check"
+-- SQLSTATE: 23514
 
 ** Keluaran : **
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
+$ python -c "
+import psycopg
+conn = psycopg.connect('postgresql://msbd:msbd2026@localhost:5432/pagila')
+cur = conn.cursor()
+try:
+    cur.execute(open('latihan/p05/q06_domain_positive_amount.sql', 'r', encoding='utf-8').read())
+    conn.commit()
+except psycopg.Error as e:
+    print('ERROR', e)
+    print('SQLSTATE:', e.sqlstate)
+"
+ERROR: value for domain lab5.positive_amount violates check constraint "positive_amount_check"
+SQLSTATE: 23514
+
+**Alasan :**
+Domain lab5.positive_amount didefinisikan dengan klausa aturan CHECK (VALUE > 0). Ketika nilai 0.00 atau -15.50 dimasukkan ke dalam kolom bertipe domain tersebut, mesin PostgreSQL melakukan validasi tipe data di tingkat skema sebelum data ditulis ke disk. Karena nilai tersebut melanggar batasan > 0, transaksi langsung dibatalkan (abort) dan melempar SQLSTATE 23514.
 
 
+### Q7
+
+** Perintah : **
+-- Diminta: menguji penambahan status 'EXPIRED' pada ENUM lab5.rental_status dan perilakunya.
+-- Dipilih: penggunaan ALTER TYPE ... ADD VALUE untuk memperluas definisi ENUM secara aman.
+-- Alternatif: mengubah kolom menjadi VARCHAR; tidak dipilih karena menghilangkan validasi ketat tingkat basis data.
+
+-- 1. Coba set status ke 'EXPIRED' sebelum diperbarui
+UPDATE lab5.rental_tx 
+SET status = 'EXPIRED' 
+WHERE rental_id = 1;
+
+-- Galat yang dihasilkan:
+-- ERROR:  invalid input value for enum lab5.rental_status: "EXPIRED"
+-- SQLSTATE: 22P02
+
+-- 2. Tambahkan nilai 'EXPIRED' ke dalam ENUM
+ALTER TYPE lab5.rental_status ADD VALUE 'EXPIRED';
+
+-- 3. Ulangi percobaan pembaruan status
+UPDATE lab5.rental_tx 
+SET status = 'EXPIRED' 
+WHERE rental_id = 1;
+
+-- Hasil:
+-- UPDATE 1 (Berhasil diperbarui tanpa galat)
+
+** Keluaran : **
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
+$ python -c "
+import psycopg
+conn = psycopg.connect('postgresql://msbd:msbd2026@localhost:5432/pagila')
+cur = conn.cursor()
+try:
+    cur.execute(\"UPDATE lab5.rental_tx SET status = 'EXPIRED' WHERE rental_id = 1;\")
+except psycopg.Error as e:
+    print('ERROR sebelum ALTER:', e)
+    print('SQLSTATE:', e.sqlstate)
+conn.rollback()
+cur.execute(\"ALTER TYPE lab5.rental_status ADD VALUE 'EXPIRED';\")
+conn.commit()
+cur.execute(\"UPDATE lab5.rental_tx SET status = 'EXPIRED' WHERE rental_id = 1;\")
+conn.commit()
+print('Berhasil UPDATE setelah ALTER TYPE')
+"
+ERROR sebelum ALTER: invalid input value for enum lab5.rental_status: "EXPIRED"
+SQLSTATE: 22P02
+Berhasil UPDATE setelah ALTER TYPE
+
+** Alasan : **
+Tipe data lab5.rental_status bersifat tertutup (strongly typed) dan hanya menerima nilai yang sudah terdaftar ('ACTIVE', 'RETURNED', 'CANCELLED').
+
+Pada percobaan pertama, nilai 'EXPIRED' ditolak oleh parser PostgreSQL karena dianggap sebagai representasi teks tidak sah untuk ENUM tersebut (galat 22P02).
+
+Perintah ALTER TYPE ... ADD VALUE 'EXPIRED' memperluas definisi tipe data di dalam katalog sistem (pg_enum). Oleh karena itu, eksekusi pembaruan berikutnya berhasil tanpa galat (UPDATE 1).
 
 
+### Q8
+
+** Perintah : **
+-- Diminta: mengedit kolom tags (array) dengan 3 nilai dan melakukan pencarian menggunakan operator array.
+-- Dipilih: operator `= ANY()` untuk memeriksa keberadaan elemen di dalam array secara langsung.
+-- Alternatif: operator containment `@>`; tidak dipilih karena `= ANY()` lebih eksplisit untuk pencarian tunggal.
+
+-- 1. Isi tags dengan tiga nilai
+UPDATE lab5.rental_tx 
+SET tags = ARRAY['promo', 'akhir-pekan', 'anggota'] 
+WHERE rental_id = 1;
+
+-- 2. Cari baris yang memiliki tag 'promo'
+SELECT rental_id, tags 
+FROM lab5.rental_tx 
+WHERE 'promo' = ANY(tags);
+
+** Keluaran : **
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
+$ python -c "
+import psycopg
+conn = psycopg.connect('postgresql://msbd:msbd2026@localhost:5432/pagila')
+cur = conn.cursor()
+cur.execute(open('latihan/p05/q08_tags_array.sql', 'r', encoding='utf-8').read())
+conn.commit()
+cur.execute(\"SELECT rental_id, tags FROM lab5.rental_tx WHERE 'promo' = ANY(tags);\")
+print('Hasil Q8:', cur.fetchall())
+"
+Hasil Q8: [(1, ['promo', 'akhir-pekan', 'anggota'])]
+
+** Alasan : **
+['promo', 'akhir-pekan', 'anggota']?
+PostgreSQL mendukung tipe data larik/array (text[]). Saat melakukan UPDATE, operator ARRAY[...] mengemas nilai menjadi satu kesatuan elemen struktur data. Ketika diakses menggunakan operator 'promo' = ANY(tags), PostgreSQL memindai seluruh elemen array secara efisien. Driver psycopg 3 secara otomatis mengonversi tipe array PostgreSQL menjadi tipe data native Python (list).
 
 
+### Q9
+
+** Perintah : **
+-- Diminta: menyimpan metadata berbentuk JSONB dan mengambil atribut channel sebagai teks.
+-- Dipilih: operator `->>` untuk langsung mendapatkan keluaran bertipe text.
+-- Alternatif: operator `->`; tidak dipilih karena menghasilkan objek JSON (ditutupi tanda petik).
+
+-- 1. Simpan payload JSONB
+UPDATE lab5.rental_tx 
+SET metadata = '{"channel":"web","device":"android"}'::jsonb 
+WHERE rental_id = 1;
+
+-- 2. Ambil nilai channel
+SELECT rental_id, metadata ->> 'channel' AS kanal 
+FROM lab5.rental_tx 
+WHERE rental_id = 1;
+
+** Keluaran : **
+Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
+$ python -c "
+import psycopg
+conn = psycopg.connect('postgresql://msbd:msbd2026@localhost:5432/pagila')
+cur = conn.cursor()
+cur.execute(open('latihan/p05/q09_metadata_jsonb.sql', 'r', encoding='utf-8').read())
+conn.commit()
+cur.execute(\"SELECT rental_id, metadata ->> 'channel' AS kanal FROM lab5.rental_tx WHERE rental_id = 1;\")
+print('Hasil Q9:', cur.fetchall())
+"
+Hasil Q9: [(1, 'web')]
+
+** Alasan : **
+Tipe data jsonb menyimpan dokumen JSON dalam format biner yang sudah terkompresi dan terurai (parsed). Operator ->> digunakan secara khusus untuk mengekstraksi nilai dari kunci "channel" dan mengonversinya langsung menjadi tipe data teks biasa (text). Jika menggunakan operator -> (tanpa tanda >), outputnya akan tetap berupa objek jsonb bertanda petik ("web").
 
 
 ## Refleksi A
@@ -225,3 +406,8 @@ Pengujian Q3 (Pembuktian Rollback): Saat prosedur dipanggil dengan parameter neg
 
 Pengujian Q4 (Pembuktian Batas Transaksi): Saat prosedur yang disisipi perintah COMMIT dipanggil dari dalam blok transaksi Python (with psycopg.connect(...)), terminal langsung mengeluarkan galat invalid transaction termination. Hal ini membuktikan bahwa prosedur tidak memiliki hak untuk mengatur transaksi jika dipanggil dari konteks eksternal.
 
+## Refleksi B
+Pilih tags atau metadata. Apakah sebaiknya tetap di sana atau dipindahkan menjadi tabel? Berikan satu pertanyaan bisnis yang dapat mengubah keputusan tersebut.
+>> Untuk kebutuhan sistem saat ini, tags sebaiknya tetap disimpan di tabel rental_tx sebagai tipe data text[] (array), bukan dipisah ke tabel relasi baru (rental_tags). Alasannya yaitu tags berfungsi sebagai metadata/label sederhana tanpa atribut tambahan (seperti created_at, deskripsi tag, atau created_by), lalu mencegah operasi JOIN tambahan saat aplikasi membaca transaksi penyewaan, dan PostgreSQL memiliki indeks GIN (Generalized Inverted Index) yang efisien jika pencarian tag di dalam array memerlukan optimasi di masa mendatang.
+
+Pertanyaan bisnis yang dapat mengubah keputusan yaitu, "Apakah tim manajemen memerlukan analitik terpusat mengenai daftar master tag resmi beserta pembatasan hak akses dan laporan statistik penggunaan tag lintas seluruh modul sistem?". Jika jawabannya Ya, maka tags wajib dipindahkan ke tabel master tersendiri (misal: lab5.tag dan lab5.rental_tag) untuk menjaga integritas data (menghindari ketidakkonsistenan akibat typo seperti 'promo' vs 'promosi') dan mempermudah agregasi.
