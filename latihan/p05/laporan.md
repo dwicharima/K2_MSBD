@@ -391,6 +391,41 @@ Hasil Q9: [(1, 'web')]
 Tipe data jsonb menyimpan dokumen JSON dalam format biner yang sudah terkompresi dan terurai (parsed). Operator ->> digunakan secara khusus untuk mengekstraksi nilai dari kunci "channel" dan mengonversinya langsung menjadi tipe data teks biasa (text). Jika menggunakan operator -> (tanpa tanda >), outputnya akan tetap berupa objek jsonb bertanda petik ("web").
 
 
+###Q10: SELECT berparameter
+
+Query: SELECT * FROM film WHERE title = %s
+Parameter: ('ACADEMY DINOSAUR',)
+Hasil: [(1, 'ACADEMY DINOSAUR', 'A Epic Drama of a Feminist And a Mad Scientist who must Battle a Teacher in The Canadian Rockies', 2006, 1, None, 6, Decimal('0.99'), 86, Decimal('20.99'), 'PG', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Deleted Scenes', 'Behind the Scenes'], "'academi':1 'battl':15 'canadian':20 'dinosaur':2 'drama':5 'epic':4 'feminist':8 'mad':11 'must':14 'rocki':21 'scientist':12 'teacher':17")]
+
+
+###Q11
+SQL rawan (hanya dicetak, TIDAK dijalankan):
+SELECT * FROM customer WHERE last_name = 'SMITH' OR '1'='1'
+
+Menjalankan versi aman (parameterized) dengan payload yang sama:
+Hasil (harus kosong []): []
+
+
+###Q12: Identifier & allow-list
+
+Berhasil dieksekusi, tetapi parameter dianggap sebagai nilai konstan, bukan nama kolom
+Query setelah perbaikan: SELECT * FROM film ORDER BY "release_year"
+Hasil: [(1, 'ACADEMY DINOSAUR', 'A Epic Drama of a Feminist And a Mad Scientist who must Battle a Teacher in The Canadian Rockies', 2006, 1, None, 6, Decimal('0.99'), 86, Decimal('20.99'), 'PG', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Deleted Scenes', 'Behind the Scenes'], "'academi':1 'battl':15 'canadian':20 'dinosaur':2 'drama':5 'epic':4 'feminist':8 'mad':11 'must':14 'rocki':21 'scientist':12 'teacher':17"), (2, 'ACE GOLDFINGER', 'A Astounding Epistle of a Database Administrator And a Explorer who must Find a Car in Ancient China', 2006, 1, None, 3, Decimal('4.99'), 48, Decimal('12.99'), 'G', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Trailers', 'Deleted Scenes'], "'ace':1 'administr':9 'ancient':19 'astound':4 'car':17 'china':20 'databas':8 'epistl':5 'explor':12 'find':15 'goldfing':2 'must':14"), (3, 'ADAPTATION HOLES', 'A Astounding Reflection of a Lumberjack And a Car who must Sink a Lumberjack in A Baloon Factory', 2006, 1, None, 7, Decimal('2.99'), 50, Decimal('18.99'), 'NC-17', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Trailers', 'Deleted Scenes'], "'adapt':1 'astound':4 'baloon':19 'car':11 'factori':20 'hole':2 'lumberjack':8,16 'must':13 'reflect':5 'sink':14"), (4, 'AFFAIR PREJUDICE', 'A Fanciful Documentary of a Frisbee And a Lumberjack who must Chase a Monkey in A Shark Tank', 2006, 1, None, 5, Decimal('2.99'), 117, Decimal('26.99'), 'G', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Commentaries', 'Behind the Scenes'], "'affair':1 'chase':14 'documentari':5 'fanci':4 'frisbe':8 'lumberjack':11 'monkey':16 'must':13 'prejudic':2 'shark':19 'tank':20"), (5, 'AFRICAN EGG', 'A Fast-Paced Documentary of a Pastry Chef And a Dentist who must Pursue a Forensic Psychologist in The Gulf of Mexico', 2006, 1, None, 6, Decimal('2.99'), 130, Decimal('22.99'), 'G', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Deleted Scenes'], "'african':1 'chef':11 'dentist':14 'documentari':7 'egg':2 'fast':5 'fast-pac':4 'forens':19 'gulf':23 'mexico':25 'must':16 'pace':6 'pastri':10 'psychologist':20 'pursu':17")]
+
+
+###Q13: Rollback dari aplikasi
+
+Jumlah baris SEBELUM: 16044
+Exception ditangkap: gagal di tengah alur
+Jumlah baris SESUDAH: 16044
+Penjelasan: karena exception dilempar SEBELUM blok 'with conn.transaction()' selesai, psycopg otomatis ROLLBACK seluruh transaksi -> jumlah baris tidak berubah.
+
+
+###Q14: ConnectionPool
+
+Statistik pool: {'requests_num': 5, 'requests_queued': 1, 'connections_num': 2, 'connections_ms': 64, 'requests_wait_ms': 32, 'usage_ms': 15, 'pool_min': 2, 'pool_max': 2, 'pool_size': 2, 'pool_available': 2, 'requests_waiting': 0}
+
+
 ## Refleksi A
 Setelah Q3 dan Q4, siapa yang memulai transaksi, siapa yang mengakhirinya, dan bagaimana kelompok membuktikannya dari data?
 >> Siapa yang memulai transaksi?
@@ -411,3 +446,10 @@ Pilih tags atau metadata. Apakah sebaiknya tetap di sana atau dipindahkan menjad
 >> Untuk kebutuhan sistem saat ini, tags sebaiknya tetap disimpan di tabel rental_tx sebagai tipe data text[] (array), bukan dipisah ke tabel relasi baru (rental_tags). Alasannya yaitu tags berfungsi sebagai metadata/label sederhana tanpa atribut tambahan (seperti created_at, deskripsi tag, atau created_by), lalu mencegah operasi JOIN tambahan saat aplikasi membaca transaksi penyewaan, dan PostgreSQL memiliki indeks GIN (Generalized Inverted Index) yang efisien jika pencarian tag di dalam array memerlukan optimasi di masa mendatang.
 
 Pertanyaan bisnis yang dapat mengubah keputusan yaitu, "Apakah tim manajemen memerlukan analitik terpusat mengenai daftar master tag resmi beserta pembatasan hak akses dan laporan statistik penggunaan tag lintas seluruh modul sistem?". Jika jawabannya Ya, maka tags wajib dipindahkan ke tabel master tersendiri (misal: lab5.tag dan lab5.rental_tag) untuk menjaga integritas data (menghindari ketidakkonsistenan akibat typo seperti 'promo' vs 'promosi') dan mempermudah agregasi.
+
+## Refleksi C
+Rollback pada Q3 dipicu oleh database: RAISE EXCEPTION di dalam lab5.process_rental ketika p_amount negatif, sehingga Postgres sendiri yang membatalkan transaksi sebelum baris apapun tersimpan. Rollback pada Q13 dipicu oleh aplikasi: prosedurnya sendiri berhasil dijalankan tanpa error SQL, tapi RuntimeError di kode Python membuat context manager with psycopg.connect(...) memanggil rollback() sebelum sempat commit().
+
+Persamaannya: keduanya sama-sama memanfaatkan sifat atomik transaksi Postgres — begitu satu blok transaksi dibatalkan (apapun pemicunya), seluruh perubahan multi-INSERT di dalamnya (baik rental_tx maupun payment_tx) ikut batal bersama, tidak ada data setengah jadi yang tertinggal.
+
+Satu hal yang hanya bisa dilakukan sisi aplikasi: membatalkan transaksi berdasarkan kondisi yang tidak diketahui oleh database — misalnya gagalnya pemanggilan API eksternal, aturan bisnis yang butuh data di luar database, atau keputusan berdasarkan hasil beberapa query terpisah. Database tidak bisa tahu hal-hal ini karena validasinya (RAISE EXCEPTION) hanya bisa melihat data yang ada di dalam query/prosedur itu sendiri, sedangkan aplikasi bisa menggabungkan logika dari mana saja sebelum memutuskan commit atau rollback.
