@@ -2,11 +2,11 @@
 
 | Nama | NIM | Kontribusi |
 |------|-----|------------|
-| Agnes Natalia Siregar | 251402108 | Q1-Q4, refleksi A |
+| Agnes Natalia Siregar | 251402108 | Q1-Q4, Reflektif A |
 | Fakhry Adrian Daulay | 251402053 |  | 
 | Rasyd Arija A. Ritonga |251402020 |  | 
 | Dwi Charima Husni | 251402088 |  |
-| Abdullah Zufar Aulia | 251402111 |  |
+| Abdullah Zufar Aulia | 251402111 | Q21-Q24, Reflektif E |
 
 ### Q1
 
@@ -426,6 +426,142 @@ Penjelasan: karena exception dilempar SEBELUM blok 'with conn.transaction()' sel
 Statistik pool: {'requests_num': 5, 'requests_queued': 1, 'connections_num': 2, 'connections_ms': 64, 'requests_wait_ms': 32, 'usage_ms': 15, 'pool_min': 2, 'pool_max': 2, 'pool_size': 2, 'pool_available': 2, 'requests_waiting': 0}
 
 
+
+
+
+### Q21 · Dependency koneksi
+
+**Perintah :**
+-- Diminta: membuat dependency get_conn bergaya with-yield yang meminjam koneksi dari pool untuk dipakai endpoint FastAPI.
+-- Dipilih: generator function memakai `with pool.connection() as conn: yield conn`, memanfaatkan ConnectionPool yang sama seperti pada Q14, dan diinjeksikan lewat `Depends(get_conn)`.
+-- Alternatif: membuka `psycopg.connect(DSN)` baru di setiap endpoint; tidak dipilih karena membuka koneksi baru per-request itu mahal dan menghilangkan manfaat pooling yang sudah dibangun di Q14.
+
+```python
+pool = ConnectionPool(DSN, min_size=2, max_size=5, open=True)
+
+def get_conn():
+    with pool.connection() as conn:
+        yield conn
+```
+
+Endpoint memakainya sebagai dependency:
+```python
+@app.post("/rentals", response_model=RentalOut, status_code=201)
+def buat_rental(payload: RentalIn, conn: psycopg.Connection = Depends(get_conn)):
+    ...
+```
+
+**Keluaran :**
+Dependency ini tidak menghasilkan output tersendiri (tidak dipanggil manual), tetapi terbukti berjalan lewat log server saat menerima request:
+
+INFO: Waiting for application startup.
+INFO: Application startup complete.
+INFO: 127.0.0.1:55416 - "POST /rentals HTTP/1.1" 422 Unprocessable Content
+INFO: 127.0.0.1:55420 - "POST /rentals HTTP/1.1" 409 Conflict
+
+Setiap request POST /rentals berhasil mendapat koneksi (tidak ada galat "pool exhausted" atau timeout), dan pool tetap sehat untuk request berikutnya — membuktikan koneksi benar-benar dikembalikan ke pool setelah tiap request selesai, baik yang sukses (201) maupun yang gagal (422/409).
+
+**Alasan :**
+Pola `with pool.connection() as conn: yield conn` memastikan siklus hidup koneksi mengikuti siklus hidup request: FastAPI menjalankan kode sebelum `yield` sebagai setup, menyuntikkan `conn` ke handler, lalu setelah handler selesai (baik return normal maupun exception yang di-raise sebagai HTTPException), FastAPI menutup generator sehingga blok `with pool.connection()` ikut keluar dan mengembalikan koneksi ke pool secara otomatis. Ini mencegah kebocoran koneksi (connection leak) yang bisa terjadi kalau koneksi dibuka manual tanpa jaminan close/return pada semua jalur (termasuk jalur galat).
+
+
+### Q22 · POST /rentals
+
+**Perintah :**
+-- Diminta: membuat endpoint POST /rentals yang memanggil procedure lab5.process_rental dan mengembalikan 201 beserta rental_id.
+-- Dipilih: memanggil `CALL lab5.process_rental(...)` di dalam `conn.transaction()` lewat koneksi hasil dependency Q21, lalu mengambil rental_id dari RETURNING/INOUT procedure dan mengembalikannya sebagai JSON dengan status_code=201.
+-- Alternatif: menjalankan INSERT rental_tx dan payment_tx langsung dari endpoint tanpa procedure; tidak dipilih karena akan mengulang logika atomik yang sudah ada di Q2, dan melanggar prinsip satu tempat aturan bisnis (procedure) dipasang.
+
+```python
+@app.post("/rentals", response_model=RentalOut, status_code=201)
+def buat_rental(payload: RentalIn, conn: psycopg.Connection = Depends(get_conn)):
+    try:
+        with conn.transaction():
+            cur = conn.execute(
+                "CALL lab5.process_rental(%s::integer, %s::integer, %s::integer, %s::numeric)",
+                (payload.customer_id, payload.inventory_id, payload.staff_id, payload.amount),
+            )
+            row = cur.fetchone()
+        rental_id = row[0]
+        return RentalOut(rental_id=rental_id)
+    ...
+```
+
+**Keluaran :**
+
+$ curl -s -i -X POST localhost:8000/rentals -H 'content-type: application/json'
+-d '{"customer_id":1,"inventory_id":1,"staff_id":1,"amount":4.99}'
+HTTP/1.1 201 Created
+content-type: application/json
+
+{"rental_id":6}
+
+Log server: `INFO: 127.0.0.1:55408 - "POST /rentals HTTP/1.1" 201 Created`
+
+**Alasan :**
+Endpoint ini menjadi pintu masuk HTTP tunggal ke aturan bisnis yang sudah dibuat di Q2 (lab5.process_rental), sehingga insert ke rental_tx dan payment_tx tetap atomik meski dipicu lewat web, sama seperti dipicu lewat psql langsung. Status 201 Created dipilih (bukan 200) karena sesuai konvensi REST untuk operasi yang berhasil membuat resource baru, dan body respons hanya berisi rental_id — bukan seluruh baris rental_tx — supaya kontrak API tetap minimal dan tidak membocorkan kolom internal seperti metadata atau tags secara tidak sengaja.
+
+
+### Q23 · Nilai negatif
+
+**Perintah :**
+-- Diminta: mengirim amount negatif dan memastikan endpoint mengembalikan 422 (bukan 500), tanpa memuat SQL di respons.
+-- Dipilih: validasi `amount: float = Field(gt=0)` di skema Pydantic `RentalIn`, sehingga FastAPI menolak request sebelum handler dan sebelum menyentuh database sama sekali.
+-- Alternatif: membiarkan nilai negatif diteruskan ke database dan menangkap galat domain `positive_amount` (check_violation) di except; tidak dipilih sebagai satu-satunya lapisan karena baru gagal setelah membuka transaksi ke DB (lebih lambat, dan butuh mapping SQLSTATE tambahan) — dipertahankan hanya sebagai jaring pengaman kedua lewat `except pg_errors.NumericValueOutOfRange`.
+
+```python
+class RentalIn(BaseModel):
+    customer_id: int
+    inventory_id: int
+    staff_id: int
+    amount: float = Field(gt=0, description="Nilai pembayaran, wajib positif")
+```
+
+**Keluaran :**
+
+$ curl -s -i -X POST localhost:8000/rentals -H 'content-type: application/json'
+-d '{"customer_id":1,"inventory_id":1,"staff_id":1,"amount":-4.99}'
+HTTP/1.1 422 Unprocessable Content
+content-type: application/json
+
+{"detail":[{"type":"greater_than","loc":["body","amount"],"msg":"Input should be greater than 0","input":-4.99,"ctx":{"gt":0.0}}]}
+
+Log server: `INFO: 127.0.0.1:55416 - "POST /rentals HTTP/1.1" 422 Unprocessable Content`
+
+**Alasan :**
+Karena validasi `gt=0` dipasang di layer Pydantic, FastAPI menolak request pada tahap parsing body — fungsi `buat_rental` bahkan tidak pernah mulai dieksekusi untuk kasus ini, sehingga tidak ada koneksi database yang dibuka dan tidak ada risiko galat SQL bocor ke respons. Pesan `detail` yang dikembalikan (`"Input should be greater than 0"`) murni bahasa domain aplikasi, bukan pesan constraint database. Ini membuktikan requirement "422, bukan 500, tanpa SQL" terpenuhi di lapisan paling awal sebelum request sempat menyentuh lapisan-lapisan lain.
+
+
+### Q24 · Inventory tidak ada
+
+**Perintah :**
+-- Diminta: mengirim inventory_id yang tidak ada dan memastikan endpoint mengembalikan 409, lalu menyimpan respons utuh.
+-- Dipilih: menangkap `pg_errors.ForeignKeyViolation` dari psycopg pada blok except, lalu melempar `HTTPException(status_code=409, detail="Referensi tidak valid: customer, inventory, atau staff tidak ditemukan.")` — pesan buatan sendiri, bukan pesan mentah dari PostgreSQL.
+-- Alternatif: melakukan `SELECT COUNT(*)` manual ke tabel customer/inventory/staff sebelum CALL procedure untuk memvalidasi FK lebih dulu; tidak dipilih karena menambah round-trip query dan berpotensi race condition (data bisa berubah antara SELECT validasi dan INSERT), sama seperti alasan penolakan alternatif serupa di Q5.
+
+```python
+except pg_errors.ForeignKeyViolation:
+    raise HTTPException(
+        status_code=409,
+        detail="Referensi tidak valid: customer, inventory, atau staff tidak ditemukan.",
+    )
+```
+
+**Keluaran :**
+
+$ curl -s -i -X POST localhost:8000/rentals -H 'content-type: application/json'
+-d '{"customer_id":1,"inventory_id":999999,"staff_id":1,"amount":4.99}'
+HTTP/1.1 409 Conflict
+content-type: application/json
+
+{"detail":"Referensi tidak valid: customer, inventory, atau staff tidak ditemukan."}
+
+Log server: `INFO: 127.0.0.1:55420 - "POST /rentals HTTP/1.1" 409 Conflict`
+
+**Alasan :**
+Status 409 Conflict dipilih karena requestnya sendiri valid secara bentuk (format JSON dan tipe data benar), tetapi bertentangan dengan keadaan data saat ini (inventory_id 999999 tidak eksis) — ini beda konteks dengan 422 (galat bentuk/nilai input) maupun 404 (resource endpoint tidak ada). Karena kesalahan referensi baru bisa dipastikan setelah procedure dieksekusi di database (constraint FK adalah sumber kebenaran terakhir soal data yang benar-benar ada), penanganannya wajib di lapisan except setelah CALL, bukan di Pydantic. Pesan yang dikembalikan sengaja digeneralisasi (tidak menyebut FK/tabel mana persis yang gagal) agar klien tetap tahu ada masalah referensi tanpa mengetahui detail skema database.
+
+
 ## Refleksi A
 Setelah Q3 dan Q4, siapa yang memulai transaksi, siapa yang mengakhirinya, dan bagaimana kelompok membuktikannya dari data?
 >> Siapa yang memulai transaksi?
@@ -453,3 +589,15 @@ Rollback pada Q3 dipicu oleh database: RAISE EXCEPTION di dalam lab5.process_ren
 Persamaannya: keduanya sama-sama memanfaatkan sifat atomik transaksi Postgres — begitu satu blok transaksi dibatalkan (apapun pemicunya), seluruh perubahan multi-INSERT di dalamnya (baik rental_tx maupun payment_tx) ikut batal bersama, tidak ada data setengah jadi yang tertinggal.
 
 Satu hal yang hanya bisa dilakukan sisi aplikasi: membatalkan transaksi berdasarkan kondisi yang tidak diketahui oleh database — misalnya gagalnya pemanggilan API eksternal, aturan bisnis yang butuh data di luar database, atau keputusan berdasarkan hasil beberapa query terpisah. Database tidak bisa tahu hal-hal ini karena validasinya (RAISE EXCEPTION) hanya bisa melihat data yang ada di dalam query/prosedur itu sendiri, sedangkan aplikasi bisa menggabungkan logika dari mana saja sebelum memutuskan commit atau rollback.
+
+
+
+
+## Refleksi E
+Untuk nilai negatif, validasi dipasang di Pydantic dan domain basis data. Jelaskan apa yang hilang jika salah satunya dihapus, untuk kedua arah.
+
+>> Jika validasi Pydantic (`Field(gt=0)`) dihapus, hanya mengandalkan domain `lab5.positive_amount`:
+Request dengan amount negatif tidak lagi ditolak di gerbang API, melainkan lolos sampai `CALL lab5.process_rental(...)` benar-benar dieksekusi ke database. Prosedur baru menolaknya lewat `RAISE EXCEPTION` (SQLSTATE 22003), yang di endpoint ditangkap oleh `except pg_errors.NumericValueOutOfRange` dan tetap diterjemahkan jadi 422 — jadi secara perilaku HTTP hasil akhirnya masih benar. Namun yang hilang adalah *kecepatan dan efisiensi umpan balik*: setiap request salah kini harus sempat meminjam koneksi dari pool, membuka transaksi, dan mengirim perintah ke server database dulu sebelum tahu request itu salah — padahal kesalahannya sebenarnya bisa dideteksi tanpa menyentuh jaringan sama sekali. Selain itu, validasi jadi bergantung penuh pada satu blok except yang harus selalu dijaga cocok dengan SQLSTATE yang dilempar prosedur; kalau lupa ditangkap dengan tepat, galat itu jatuh ke `except psycopg.Error` generik dan klien menerima 500, bukan 422.
+
+>> Jika domain `lab5.positive_amount` dihapus, hanya mengandalkan Pydantic:
+Endpoint FastAPI ini sendiri tetap aman, karena `Field(gt=0)` masih menolak nilai negatif sebelum sampai ke database. Yang hilang adalah *perlindungan di luar jalur endpoint ini*. Kolom `amount` pada tabel `payment_tx` jadi hanya dijaga oleh satu titik masuk (endpoint /rentals) — kalau di masa depan ada skrip migrasi, tool admin, laporan batch, atau layanan lain yang menulis langsung ke `payment_tx` (lewat psql, ORM lain, atau bug di endpoint baru yang lupa memberi validasi), tidak ada lagi jaring pengaman yang mencegah nilai nol atau negatif tersimpan. Inilah alasan kedua lapisan tetap dipasang sekaligus (defense-in-depth): Pydantic menjaga *pengalaman* klien API supaya cepat dan jelas, sedangkan domain basis data menjaga *kebenaran data* itu sendiri apa pun jalur atau aplikasi yang menulis ke tabel tersebut.
