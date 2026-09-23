@@ -1,16 +1,17 @@
 # Laporan Latihan Kelompok Pertemuan 5
 
-| Nama | NIM | Kontribusi |
-|------|-----|------------|
-| Agnes Natalia Siregar | 251402108 | Setup q00, Q1-Q5, Reflektif A |
-| Fakhry Adrian Daulay | 251402053 | Q6-Q9, Reflektif B  | 
-| Rasyd Arija A. Ritonga |251402020 | Q10-Q15, Reflektif C | 
-| Dwi Charima Husni | 251402088 | Q16-Q20, Reflektif D |
-| Abdullah Zufar Aulia | 251402111 | Q21-Q24, Reflektif E |
+| Nama                   | NIM       | Kontribusi                    |
+| ---------------------- | --------- | ----------------------------- |
+| Agnes Natalia Siregar  | 251402108 | Setup q00, Q1-Q5, Reflektif A |
+| Fakhry Adrian Daulay   | 251402053 | Q6-Q9, Reflektif B            |
+| Rasyd Arija A. Ritonga | 251402020 | Q10-Q15, Reflektif C          |
+| Dwi Charima Husni      | 251402088 | Q16-Q20, Reflektif D          |
+| Abdullah Zufar Aulia   | 251402111 | Q21-Q24, Reflektif E          |
 
 ### Q1
 
 **Perintah :**
+
 ```
 -- Diminta: menulis function lab5.total_dibayar(p_rental_id bigint) untuk menghitung total pembayaran suatu penyewaan.
 -- Dipilih: menggunakan fungsi SQL STABLE dengan coalesce untuk menangani nilai null.
@@ -23,19 +24,21 @@ $$;
 ```
 
 **Keluaran :**
+
 ```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p05)
 $ python -c 'import psycopg; conn = psycopg.connect("postgresql://msbd:msbd2026@localhost:5432/pagila"); cur = conn.cursor(); cur.execute(open("latihan/p05/q01_total_dibayar.sql", "r", encoding="utf-8").read()); conn.commit(); cur.execute("SELECT lab5.total_dibayar(1);"); print("Hasil Q1:", cur.fetchall())'
 Hasil Q1: [(Decimal('25.00'),)]
-(.venv) 
+(.venv)
 ```
 
 **Alasan :**
 Perintah ini Untuk menghitung dan menjumlahkan total nominal pembayaran (amount) yang masuk pada tabel transaksi pembayaran (lab5.payment_tx), guna memastikan bahwa seluruh data finansial dari aktivitas rental yang diproses terekam dan teragregasi secara akurat.
 
-### Q2 
+### Q2
 
 **Perintah :**
+
 ```
 -- Diminta: menulis prosedur lab5.process_rental untuk memproses penyewaan baru dan mencatat pembayarannya secara transaksional.
 -- Dipilih: menggunakan prosedur PL/pgSQL dengan blok transaksi eksplisit dan penanganan parameter input.
@@ -66,21 +69,22 @@ $$;
 ```
 
 **Keluaran :**
+
 ```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p05)
 $ python -c 'import psycopg; conn = psycopg.connect("postgresql://msbd:msbd2026@localhost:5432/pagila"); cur = conn.cursor(); cur.execute("SELECT * FROM lab5.rental_tx;"); print("rental_tx:", cur.fetchall()); cur.execute("SELECT * FROM lab5.payment_tx;"); print("payment_tx:", cur.fetchall())'
 rental_tx: [(1, 1, 1, 1, 'ACTIVE', [], {}, datetime.datetime(2026, 9, 21, 12, 53, 22, 191520, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')))]
 payment_tx: [(1, 1, Decimal('25.00'), datetime.datetime(2026, 9, 21, 12, 53, 22, 191520, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')))]
-(.venv) 
+(.venv)
 ```
 
 **Alasan :**
 Perintah untuk mengeksekusi proses penyewaan dan pembayaran secara atomik (satu kesatuan). Artinya, data penyewaan (rental_tx) dan pembayaran (payment_tx) harus berhasil disimpan secara bersamaan. Jika salah satu gagal, seluruh perubahan dibatalkan (rollback) untuk mencegah terjadinya data yang tidak konsisten atau menggantung.
 
-
-### Q3 
+### Q3
 
 **Perintah :**
+
 ```
 -- Diminta: Membuktikan rollback transaksi saat p_amount bernilai negatif pada lab5.process_rental.
 -- Dipilih: Melakukan pemanggilan dengan nilai negatif, menyalin galat, dan menghitung jumlah baris rental_tx.
@@ -99,6 +103,7 @@ SELECT count(*) AS jumlah_rental FROM lab5.rental_tx;
 ```
 
 **Keluaran :**
+
 ```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p05)
 $ python -c 'import psycopg; conn = psycopg.connect("postgresql://msbd:msbd2026@localhost:5432/pagila"); cur = conn.cursor()
@@ -112,7 +117,7 @@ print("Jumlah rental:", cur.fetchone()[0])'
 Galat: nilai pembayaran harus positif, diterima -4.99
 CONTEXT:  PL/pgSQL function lab5.process_rental(integer,integer,integer,numeric,jsonb,bigint) line 4 at RAISE
 Jumlah rental: 1
-(.venv) 
+(.venv)
 ```
 
 **Alasan & Penjelasan Mengapa Jumlahnya Tidak Bertambah :**
@@ -120,8 +125,8 @@ Karena di dalam prosedur lab5.process_rental terdapat validasi IF p_amount <= 0.
 
 Akibat sifat atomik transaksi basis data, seluruh perubahan yang sempat terjadi di dalam blok transaksi tersebut langsung dibatalkan (rollback). Oleh karena itu, jumlah baris pada lab5.rental_tx tidak bertambah (tetap seperti semula) karena tidak ada data baru yang berhasil disimpan.
 
-
 ### Q4
+
 ```
 **Perintah :**
 -- Diminta: Membuat salinan procedure yang menjalankan COMMIT di tengah eksekusi (setelah insert pertama).
@@ -157,6 +162,7 @@ $$;
 ```
 
 **Keluaran :**
+
 ```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p05)
 $ python -c 'import psycopg
@@ -168,15 +174,16 @@ except Exception as e:
     print("Galat:", e)'
 Galat: invalid transaction termination
 CONTEXT:  PL/pgSQL function lab5.process_rental_with_commit(integer,integer,integer,numeric,jsonb,bigint) line 14 at COMMIT
-(.venv) 
+(.venv)
 ```
 
 **Alasan :**
 PostgreSQL melarang adanya perintah COMMIT atau ROLLBACK di dalam prosedur PL/pgSQL jika prosedur tersebut dipanggil dari dalam blok transaksi eksternal (seperti koneksi Python with psycopg.connect()). Manajemen transaksi sepenuhnya dipegang oleh aplikasi pemanggil di luar, sehingga prosedur tidak boleh mengatur akhir transaksinya sendiri untuk mencegah inkonsistensi sistem basis data.
 
-
 ### Q5
+
 **Perintah :**
+
 ```
 -- Diminta: Menangkap galat foreign_key_violation dan memberikan pesan ramah.
 -- Dipilih: Blok EXCEPTION WHEN foreign_key_violation di dalam PL/pgSQL.
@@ -211,6 +218,7 @@ $$;
 ```
 
 **Keluaran :**
+
 ```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
 $ python -c "
@@ -237,8 +245,8 @@ SQLSTATE: 23503
 **Alasan :**
 Saat customer_id bernilai 99999 dimasukkan, PostgreSQL mendeteksi bahwa ID tersebut tidak ada pada tabel acuan (public.customer). Blok EXCEPTION WHEN foreign_key_violation memotong galat mentah bawaan (default constraints error) dan menghentikan transaksi, lalu menggantikannya dengan pesan kustom melalui RAISE EXCEPTION. Tipe galatnya tetap berada di kelas foreign_key_violation sehingga SQLSTATE yang diterima oleh psycopg tetap bernilai 23503.
 
-
 ### Q6
+
 ```
 **Perintah :**
 -- Diminta: memasukkan nilai nol dan negatif ke lab5.payment_tx untuk menguji domain positive_amount.
@@ -246,7 +254,7 @@ Saat customer_id bernilai 99999 dimasukkan, PostgreSQL mendeteksi bahwa ID terse
 -- Alternatif: satu INSERT dengan multiple values; tidak dipilih karena eksekusi terhenti pada galat pertama.
 
 -- 1. Uji nilai nol (0.00)
-INSERT INTO lab5.payment_tx (rental_id, amount) 
+INSERT INTO lab5.payment_tx (rental_id, amount)
 VALUES (1, 0.00);
 
 -- Galat yang dihasilkan:
@@ -254,7 +262,7 @@ VALUES (1, 0.00);
 -- SQLSTATE: 23514
 
 -- 2. Uji nilai negatif (-15.50)
-INSERT INTO lab5.payment_tx (rental_id, amount) 
+INSERT INTO lab5.payment_tx (rental_id, amount)
 VALUES (1, -15.50);
 
 -- Galat yang dihasilkan:
@@ -263,6 +271,7 @@ VALUES (1, -15.50);
 ```
 
 **Keluaran :**
+
 ```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
 $ python -c "
@@ -283,8 +292,8 @@ SQLSTATE: 23514
 **Alasan :**
 Domain lab5.positive_amount didefinisikan dengan klausa aturan CHECK (VALUE > 0). Ketika nilai 0.00 atau -15.50 dimasukkan ke dalam kolom bertipe domain tersebut, mesin PostgreSQL melakukan validasi tipe data di tingkat skema sebelum data ditulis ke disk. Karena nilai tersebut melanggar batasan > 0, transaksi langsung dibatalkan (abort) dan melempar SQLSTATE 23514.
 
-
 ### Q7
+
 ```
 **Perintah :**
 -- Diminta: menguji penambahan status 'EXPIRED' pada ENUM lab5.rental_status dan perilakunya.
@@ -292,8 +301,8 @@ Domain lab5.positive_amount didefinisikan dengan klausa aturan CHECK (VALUE > 0)
 -- Alternatif: mengubah kolom menjadi VARCHAR; tidak dipilih karena menghilangkan validasi ketat tingkat basis data.
 
 -- 1. Coba set status ke 'EXPIRED' sebelum diperbarui
-UPDATE lab5.rental_tx 
-SET status = 'EXPIRED' 
+UPDATE lab5.rental_tx
+SET status = 'EXPIRED'
 WHERE rental_id = 1;
 
 -- Galat yang dihasilkan:
@@ -304,8 +313,8 @@ WHERE rental_id = 1;
 ALTER TYPE lab5.rental_status ADD VALUE 'EXPIRED';
 
 -- 3. Ulangi percobaan pembaruan status
-UPDATE lab5.rental_tx 
-SET status = 'EXPIRED' 
+UPDATE lab5.rental_tx
+SET status = 'EXPIRED'
 WHERE rental_id = 1;
 
 -- Hasil:
@@ -313,6 +322,7 @@ WHERE rental_id = 1;
 ```
 
 **Keluaran :**
+
 ```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
 $ python -c "
@@ -343,27 +353,28 @@ Pada percobaan pertama, nilai 'EXPIRED' ditolak oleh parser PostgreSQL karena di
 
 Perintah ALTER TYPE ... ADD VALUE 'EXPIRED' memperluas definisi tipe data di dalam katalog sistem (pg_enum). Oleh karena itu, eksekusi pembaruan berikutnya berhasil tanpa galat (UPDATE 1).
 
-
 ### Q8
 
 **Perintah :**
+
 ```
 -- Diminta: mengedit kolom tags (array) dengan 3 nilai dan melakukan pencarian menggunakan operator array.
 -- Dipilih: operator `= ANY()` untuk memeriksa keberadaan elemen di dalam array secara langsung.
 -- Alternatif: operator containment `@>`; tidak dipilih karena `= ANY()` lebih eksplisit untuk pencarian tunggal.
 
 -- 1. Isi tags dengan tiga nilai
-UPDATE lab5.rental_tx 
-SET tags = ARRAY['promo', 'akhir-pekan', 'anggota'] 
+UPDATE lab5.rental_tx
+SET tags = ARRAY['promo', 'akhir-pekan', 'anggota']
 WHERE rental_id = 1;
 
 -- 2. Cari baris yang memiliki tag 'promo'
-SELECT rental_id, tags 
-FROM lab5.rental_tx 
+SELECT rental_id, tags
+FROM lab5.rental_tx
 WHERE 'promo' = ANY(tags);
 ```
 
 **Keluaran :**
+
 ```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
 $ python -c "
@@ -382,27 +393,28 @@ Hasil Q8: [(1, ['promo', 'akhir-pekan', 'anggota'])]
 ['promo', 'akhir-pekan', 'anggota']?
 PostgreSQL mendukung tipe data larik/array (text[]). Saat melakukan UPDATE, operator ARRAY[...] mengemas nilai menjadi satu kesatuan elemen struktur data. Ketika diakses menggunakan operator 'promo' = ANY(tags), PostgreSQL memindai seluruh elemen array secara efisien. Driver psycopg 3 secara otomatis mengonversi tipe array PostgreSQL menjadi tipe data native Python (list).
 
-
 ### Q9
 
 **Perintah :**
+
 ```
 -- Diminta: menyimpan metadata berbentuk JSONB dan mengambil atribut channel sebagai teks.
 -- Dipilih: operator `->>` untuk langsung mendapatkan keluaran bertipe text.
 -- Alternatif: operator `->`; tidak dipilih karena menghasilkan objek JSON (ditutupi tanda petik).
 
 -- 1. Simpan payload JSONB
-UPDATE lab5.rental_tx 
-SET metadata = '{"channel":"web","device":"android"}'::jsonb 
+UPDATE lab5.rental_tx
+SET metadata = '{"channel":"web","device":"android"}'::jsonb
 WHERE rental_id = 1;
 
 -- 2. Ambil nilai channel
-SELECT rental_id, metadata ->> 'channel' AS kanal 
-FROM lab5.rental_tx 
+SELECT rental_id, metadata ->> 'channel' AS kanal
+FROM lab5.rental_tx
 WHERE rental_id = 1;
 ```
 
 **Keluaran :**
+
 ```
 Fakhry Adrian@Fakhry MINGW64 ~/OneDrive/Documents/Tubes_MSBD/K2_MSBD (latihan/p05)
 $ python -c "
@@ -422,51 +434,150 @@ Tipe data jsonb menyimpan dokumen JSON dalam format biner yang sudah terkompresi
 
 ### Q10: SELECT berparameter
 
-**Perintah :**
+**perintah**
+-- Diminta: menjalankan query SELECT dengan parameter binding (bukan string formatting) untuk mengambil data film berdasarkan judul.
+-- Dipilih: placeholder %s dan tuple parameter terpisah, memanfaatkan mekanisme parameter binding bawaan psycopg.
+-- Alternatif: f-string / .format() untuk menyisipkan nilai langsung ke query; tidak dipilih karena rawan SQL injection dan menjadi pembanding pada Q11.
+
+cur.execute("SELECT \* FROM film WHERE title = %s", ('ACADEMY DINOSAUR',))
+
 ```
+
+**output**
 Query: SELECT * FROM film WHERE title = %s
 Parameter: ('ACADEMY DINOSAUR',)
 Hasil: [(1, 'ACADEMY DINOSAUR', 'A Epic Drama of a Feminist And a Mad Scientist who must Battle a Teacher in The Canadian Rockies', 2006, 1, None, 6, Decimal('0.99'), 86, Decimal('20.99'), 'PG', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Deleted Scenes', 'Behind the Scenes'], "'academi':1 'battl':15 'canadian':20 'dinosaur':2 'drama':5 'epic':4 'feminist':8 'mad':11 'must':14 'rocki':21 'scientist':12 'teacher':17")]
-```
+
+**alasan**
+Placeholder %s pada psycopg tidak menyisipkan nilai langsung ke teks query, melainkan mengirim query dan parameter secara terpisah ke server PostgreSQL (protokol extended query).
 
 ### Q11
-```
+**printah**
+-- Diminta: menunjukkan bahaya SQL injection dengan query rawan, lalu membuktikan query berparameter kebal terhadap payload yang sama.
+-- Dipilih: mencetak (tidak menjalankan) versi rawan hasil string concatenation, lalu mengeksekusi versi aman dengan payload identik sebagai parameter.
+-- Alternatif: langsung menjalankan versi rawan untuk pembuktian nyata; tidak dipilih karena berisiko merusak/membocorkan data sungguhan meski di lab, cukup dicetak sebagai ilustrasi.
+payload = "SMITH' OR '1'='1"
+
+# Versi rawan (HANYA dicetak, tidak dieksekusi)
+sql_rawan = f"SELECT * FROM customer WHERE last_name = '{payload}'"
+print(sql_rawan)
+
+# Versi aman (dieksekusi dengan payload yang sama)
+cur.execute("SELECT * FROM customer WHERE last_name = %s", (payload,))
+print(cur.fetchall())
+
+**output**
 SQL rawan (hanya dicetak, TIDAK dijalankan):
 SELECT * FROM customer WHERE last_name = 'SMITH' OR '1'='1'
 
 Menjalankan versi aman (parameterized) dengan payload yang sama:
 Hasil (harus kosong []): []
-```
+
+**alasan**
+Pada versi rawan, payload SMITH' OR '1'='1 yang disisipkan lewat string concatenation mengubah struktur logika WHERE: tanda kutip tunggal di dalam payload menutup literal string lebih awal, lalu klausa OR '1'='1' yang selalu bernilai TRUE membuat seluruh baris tabel customer ikut lolos filter — inilah esensi SQL injection. sebaliknya untuk vrsi yang aman
 
 ### Q12
-```
+**perintah**
+-- Diminta: mencoba mem-parameterisasi nama kolom pada klausa ORDER BY, lalu memperbaikinya jika gagal/tidak sesuai harapan.
+-- Dipilih: pertama mencoba %s untuk nama kolom (menunjukkan parameter hanya berlaku untuk nilai, bukan identifier), lalu memperbaiki dengan psycopg.sql.Identifier agar nama kolom disisipkan secara aman sebagai identifier.
+-- Alternatif: langsung menyisipkan nama kolom lewat f-string; tidak dipilih karena membuka celah SQL injection lewat parameter nama kolom yang tidak divalidasi.
+
+# Percobaan awal - gagal secara semantik: %s memperlakukan 'release_year' sebagai literal string, bukan nama kolom
+cur.execute("SELECT * FROM film ORDER BY %s", ('release_year',))
+
+# Perbaikan - menggunakan sql.Identifier untuk menyisipkan nama kolom secara aman
+from psycopg import sql
+query = sql.SQL("SELECT * FROM film ORDER BY {}").format(sql.Identifier('release_year'))
+cur.execute(query)
+
+**output**
 Berhasil dieksekusi, tetapi parameter dianggap sebagai nilai konstan, bukan nama kolom
 Query setelah perbaikan: SELECT * FROM film ORDER BY "release_year"
 Hasil: [(1, 'ACADEMY DINOSAUR', 'A Epic Drama of a Feminist And a Mad Scientist who must Battle a Teacher in The Canadian Rockies', 2006, 1, None, 6, Decimal('0.99'), 86, Decimal('20.99'), 'PG', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Deleted Scenes', 'Behind the Scenes'], "'academi':1 'battl':15 'canadian':20 'dinosaur':2 'drama':5 'epic':4 'feminist':8 'mad':11 'must':14 'rocki':21 'scientist':12 'teacher':17"), (2, 'ACE GOLDFINGER', 'A Astounding Epistle of a Database Administrator And a Explorer who must Find a Car in Ancient China', 2006, 1, None, 3, Decimal('4.99'), 48, Decimal('12.99'), 'G', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Trailers', 'Deleted Scenes'], "'ace':1 'administr':9 'ancient':19 'astound':4 'car':17 'china':20 'databas':8 'epistl':5 'explor':12 'find':15 'goldfing':2 'must':14"), (3, 'ADAPTATION HOLES', 'A Astounding Reflection of a Lumberjack And a Car who must Sink a Lumberjack in A Baloon Factory', 2006, 1, None, 7, Decimal('2.99'), 50, Decimal('18.99'), 'NC-17', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Trailers', 'Deleted Scenes'], "'adapt':1 'astound':4 'baloon':19 'car':11 'factori':20 'hole':2 'lumberjack':8,16 'must':13 'reflect':5 'sink':14"), (4, 'AFFAIR PREJUDICE', 'A Fanciful Documentary of a Frisbee And a Lumberjack who must Chase a Monkey in A Shark Tank', 2006, 1, None, 5, Decimal('2.99'), 117, Decimal('26.99'), 'G', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Commentaries', 'Behind the Scenes'], "'affair':1 'chase':14 'documentari':5 'fanci':4 'frisbe':8 'lumberjack':11 'monkey':16 'must':13 'prejudic':2 'shark':19 'tank':20"), (5, 'AFRICAN EGG', 'A Fast-Paced Documentary of a Pastry Chef And a Dentist who must Pursue a Forensic Psychologist in The Gulf of Mexico', 2006, 1, None, 6, Decimal('2.99'), 130, Decimal('22.99'), 'G', datetime.datetime(2017, 9, 10, 14, 46, 3, 905795, tzinfo=zoneinfo.ZoneInfo(key='Etc/UTC')), ['Deleted Scenes'], "'african':1 'chef':11 'dentist':14 'documentari':7 'egg':2 'fast':5 'fast-pac':4 'forens':19 'gulf':23 'mexico':25 'must':16 'pace':6 'pastri':10 'psychologist':20 'pursu':17")]
-```
+
+**alasan**
+diinterpretasikan sebagai "urutkan berdasarkan nilai konstan", bukan berdasarkan kolom — hasilnya urutan data tidak berubah dari urutan aslinya. Solusinya memakai psycopg.sql.Identifier, yang membungkus nama kolom dengan tanda kutip ganda ("release_year") sekaligus melakukan escaping aman terhadap karakter berbahaya, sehingga PostgreSQL membacanya sebagai referensi kolom yang sah tanpa membuka celah injection lewat nama kolom dinamis.
 
 ### Q13
-```
+**perintah**
+-- Diminta: membuktikan bahwa exception yang dilempar di tengah blok `with conn.transaction()` memicu rollback otomatis oleh psycopg.
+-- Dipilih: menghitung jumlah baris sebelum, menyisipkan exception buatan di tengah blok transaksi, menangkapnya di luar, lalu menghitung ulang jumlah baris sesudahnya.
+-- Alternatif: memanggil conn.rollback() secara manual di except; tidak dipilih karena tujuan soal adalah membuktikan perilaku rollback *otomatis* bawaan context manager transaction(), bukan rollback yang dipicu manual.
+
+jumlah_sebelum = cur.execute("SELECT count(*) FROM rental").fetchone()[0]
+print("Jumlah baris SEBELUM:", jumlah_sebelum)
+
+try:
+    with conn.transaction():
+        cur.execute("INSERT INTO rental (rental_date, inventory_id, customer_id, staff_id) VALUES (now(), 1, 1, 1)")
+        raise RuntimeError("gagal di tengah alur")
+except Exception as e:
+    print("Exception ditangkap:", e)
+
+jumlah_sesudah = cur.execute("SELECT count(*) FROM rental").fetchone()[0]
+print("Jumlah baris SESUDAH:", jumlah_sesudah)
+
+**output**
 Jumlah baris SEBELUM: 16044
 Exception ditangkap: gagal di tengah alur
 Jumlah baris SESUDAH: 16044
 Penjelasan: karena exception dilempar SEBELUM blok 'with conn.transaction()' selesai, psycopg otomatis ROLLBACK seluruh transaksi -> jumlah baris tidak berubah.
-```
 
-### Q14: 
-```
+**alasan**
+exception menangkapnya saat keluar dari context, dan secara otomatis menjalankan ROLLBACK sebelum melempar ulang exception tersebut ke luar blok try
+
+### Q14:
+**perintah**
+-- Diminta: memeriksa kesehatan dan pemakaian ConnectionPool lewat get_stats() setelah pool dibebani beberapa request bersamaan.
+-- Dipilih: membuat ConnectionPool dengan pool_min=pool_max=2, menjalankan beberapa request/thread secara bersamaan agar sebagian sempat mengantre, lalu memanggil pool.get_stats().
+-- Alternatif: hanya menjalankan satu request lalu cek stats; tidak dipilih karena tidak akan menunjukkan metrik antrean (requests_queued/requests_wait_ms) yang jadi bukti utama pool bekerja saat load tinggi.
+
+from psycopg_pool import ConnectionPool
+
+pool = ConnectionPool(DSN, min_size=2, max_size=2, open=True)
+
+# simulasikan beberapa request bersamaan (mis. lewat ThreadPoolExecutor)
+...
+
+print("Statistik pool:", pool.get_stats())
+
+**output**
 Statistik pool: {'requests_num': 5, 'requests_queued': 1, 'connections_num': 2, 'connections_ms': 64, 'requests_wait_ms': 32, 'usage_ms': 15, 'pool_min': 2, 'pool_max': 2, 'pool_size': 2, 'pool_available': 2, 'requests_waiting': 0}
-```
+
+**alasan**
+connections_ms dan requests_wait_ms masing-masing mencatat total waktu pembuatan koneksi fisik dan total waktu tunggu request dalam antrean (dalam milidetik), sedangkan usage_ms mencatat total waktu koneksi benar-benar dipakai menjalankan query. Setelah beban selesai, pool_available kembali ke 2 dan requests_waiting ke 0, menandakan pool sehat dan seluruh koneksi berhasil dikembalikan tanpa ada yang bocor atau macet di antrean.
+
+### Q15
+**perintah**
+-- Diminta: membuktikan status koneksi 'idle in transaction' saat transaksi dibuka tapi belum di-commit/rollback, dengan memeriksa pg_stat_activity dari koneksi lain.
+-- Dipilih: membuka transaksi eksplisit di satu koneksi lalu sengaja time.sleep(30) tanpa commit, sehingga selama itu ada jendela waktu untuk mengecek statusnya dari sesi psql/terminal terpisah.
+-- Alternatif: mengecek pg_stat_activity dari koneksi yang sama; tidak dipilih karena koneksi yang sedang tidur di tengah transaksi tidak bisa dipakai menjalankan query lain secara bersamaan (butuh sesi kedua yang independen).
+
+$ python latihan/p05/lab5_driver.py
+
+**output**
+=== Q15: Idle in transaction ===
+Jalankan blok ini, LALU di psql/terminal lain (SELESAI dalam 30 detik) jalankan:
+  SELECT pid, state, xact_start, query FROM pg_stat_activity WHERE state LIKE 'idle in%';
+Transaksi dibuka, tidur 30 detik... (jangan tutup koneksi ini)
+Selesai, transaksi otomatis commit/close di sini.
+
+**alasan**
+tatus idle in transaction muncul ketika sebuah sesi PostgreSQL sudah menjalankan BEGIN (memulai transaksi) dan sempat mengeksekusi minimal satu perintah di dalamnya, tetapi belum melakukan COMMIT maupun ROLLBACK — koneksi masih "menggantung" menahan transaksi terbuka meski tidak sedang aktif mengerjakan apa pun (karena time.sleep(30)), oleh karena itu psycopg secara otomatis melakukan COMMIT dan menutup koneksi, sehingga baris pada pg_stat_activity untuk sesi tersebut ikut hilang setelah 30 detik berlalu.
 
 ### Q16 · Model Deklaratif SQLAlchemy
 **Perintah :**
 ```
+
 "C:/Users/Dwi Charima Husni/AppData/Local/Programs/Python/Python314/python.exe" lab5_orm.py
+
 ```
 
 **Keluaran :**
 ```
+
 Q16: Model Customer dan Rental berhasil dibuat.
+
 ```
 
 **Alasan :**
@@ -475,11 +586,14 @@ Menggunakan gaya deklaratif SQLAlchemy 2.0 karena soal meminta pemetaan model Cu
 ### Q17 · Bukti N+1 Query
 **Perintah :**
 ```
+
 "C:/Users/Dwi Charima Husni/AppData/Local/Programs/Python/Python314/python.exe" lab5_orm.py
+
 ```
 
 **Keluaran :**
 ```
+
 === Q17: N+1 Query ===
 
 2026-09-23 12:13:26,409 INFO sqlalchemy.engine.Engine SELECT public.customer.customer_id
@@ -493,24 +607,30 @@ WHERE %(param_1)s::INTEGER = public.rental.customer_id
 [Query rental yang sama dijalankan kembali untuk customer_id 2 sampai 10]
 
 Hasil: [(1, 32), (2, 27), (3, 26), (4, 22), (5, 38),
-        (6, 28), (7, 33), (8, 24), (9, 23), (10, 25)]
+(6, 28), (7, 33), (8, 24), (9, 23), (10, 25)]
 
 Dari log terlihat terdapat 1 SELECT untuk mengambil 10 customer dan 10 SELECT tambahan untuk mengambil rental dari masing-masing customer. Dengan demikian, total yang dihasilkan adalah 11 SELECT.
+
 ```
 
 **Alasan :**
 ```
+
 Pengujian ini dilakukan untuk menunjukkan pola N+1 query yang terjadi ketika relasi rentals diakses secara terpisah untuk setiap customer. Pola ini menghasilkan query tambahan sebanyak jumlah customer yang diproses, sehingga jumlah query menjadi lebih banyak dan dapat menurunkan efisiensi ketika jumlah data semakin besar.
+
 ```
 
 ### Q18 · Optimasi dengan Selectinload
 **Perintah :**
 ```
+
 "C:/Users/Dwi Charima Husni/AppData/Local/Programs/Python/Python314/python.exe" lab5_orm.py
+
 ```
 
 **Keluaran :**
 ```
+
 === Q18: selectinload ===
 
 2026-09-23 13:15:44,275 INFO sqlalchemy.engine.Engine SELECT public.customer.customer_id
@@ -522,24 +642,30 @@ FROM public.rental
 WHERE public.rental.customer_id IN (%(primary_keys_1)s::INTEGER, %(primary_keys_2)s::INTEGER, %(primary_keys_3)s::INTEGER, %(primary_keys_4)s::INTEGER, %(primary_keys_5)s::INTEGER, %(primary_keys_6)s::INTEGER, %(primary_keys_7)s::INTEGER, %(primary_keys_8)s::INTEGER, %(primary_keys_9)s::INTEGER, %(primary_keys_10)s::INTEGER)
 
 Hasil: [(1, 32), (2, 27), (3, 26), (4, 22), (5, 38),
-        (6, 28), (7, 33), (8, 24), (9, 23), (10, 25)]
+(6, 28), (7, 33), (8, 24), (9, 23), (10, 25)]
 
 Berdasarkan log, terdapat 2 SELECT, yaitu satu SELECT untuk mengambil 10 customer dan satu SELECT untuk mengambil seluruh rental dari customer tersebut menggunakan IN.
+
 ```
 
 **Alasan :**
 ```
+
 selectinload digunakan untuk mengatasi masalah N+1 pada Q17 dengan mengambil data relasi rental secara sekaligus. ID dari 10 customer dimasukkan ke dalam klausa IN, sehingga seluruh rental dapat diperoleh hanya dengan satu query tambahan. Dengan demikian, jumlah query berkurang dari 11 SELECT pada Q17 menjadi 2 SELECT.
+
 ```
 
 ### Q19 · Optimasi dengan Joinedload
 **Perintah :**
 ```
+
 "C:/Users/Dwi Charima Husni/AppData/Local/Programs/Python/Python314/python.exe" lab5_orm.py
+
 ```
 
 **Keluaran :**
 ```
+
 === Q19: joinedload ===
 
 2026-09-23 13:15:44,306 INFO sqlalchemy.engine.Engine SELECT anon_1.customer_id, rental_1.rental_id, rental_1.customer_id AS customer_id_1
@@ -550,24 +676,30 @@ LEFT OUTER JOIN public.rental AS rental_1
 ON anon_1.customer_id = rental_1.customer_id
 
 Hasil: [(7, 33), (6, 28), (1, 32), (2, 27), (9, 23),
-        (3, 26), (5, 38), (8, 24), (10, 25), (4, 22)]
+(3, 26), (5, 38), (8, 24), (10, 25), (4, 22)]
 
 Berdasarkan log, hanya terdapat 1 SELECT yang mengambil data customer sekaligus data rental menggunakan LEFT OUTER JOIN.
+
 ```
 
 **Alasan :**
 ```
+
 joinedload digunakan untuk mengambil data customer dan relasi rentals dalam satu query dengan menggunakan JOIN. Berbeda dengan selectinload pada Q18 yang menghasilkan 2 SELECT, joinedload menggabungkan pengambilan kedua data tersebut menjadi 1 SELECT. Hal ini terlihat dari penggunaan LEFT OUTER JOIN pada SQL yang dihasilkan.
+
 ```
 
 ### Q20 · ORM dibanding SQL Mentah
 **Perintah :**
 ```
+
 "C:/Users/Dwi Charima Husni/AppData/Local/Programs/Python/Python314/python.exe" lab5_orm.py
+
 ```
 
 **Keluaran :**
 ```
+
 === Q20: ORM dibanding SQL Mentah ===
 
 2026-09-23 21:08:42,923 INFO sqlalchemy.engine.Engine SELECT public.rental.customer_id, count(public.rental.rental_id) AS jumlah_sewa
@@ -583,8 +715,8 @@ Waktu ORM: 0.017044 detik
 
 2026-09-23 21:08:42,938 INFO sqlalchemy.engine.Engine
 SELECT
-    customer_id,
-    COUNT(rental_id) AS jumlah_sewa
+customer_id,
+COUNT(rental_id) AS jumlah_sewa
 FROM public.rental
 GROUP BY customer_id
 ORDER BY jumlah_sewa DESC
@@ -596,17 +728,21 @@ Hasil SQL Mentah:
 Waktu SQL mentah: 0.009961 detik
 
 Hasil yang diperoleh dari ORM dan SQL mentah sama, yaitu lima customer dengan jumlah penyewaan terbanyak. Waktu eksekusi ORM adalah 0.017044 detik, sedangkan SQL mentah adalah 0.009961 detik.
+
 ```
 
 **Alasan :**
 ```
+
 Perbandingan dilakukan untuk melihat perbedaan penggunaan ORM dan SQL mentah dalam menjalankan analisis yang sama. ORM dipilih karena lebih terintegrasi dengan model Python, sedangkan SQL mentah digunakan sebagai pembanding dengan query SQL secara langsung. Pada pengujian ini, keduanya menghasilkan data yang sama, sementara waktu eksekusi yang tercatat menunjukkan SQL mentah membutuhkan waktu lebih singkat pada percobaan tersebut.
+
 ```
 
 ### Q21 · Dependency koneksi
 
 **Perintah :**
 ```
+
 -- Diminta: membuat dependency get_conn bergaya with-yield yang meminjam koneksi dari pool untuk dipakai endpoint FastAPI.
 -- Dipilih: generator function memakai `with pool.connection() as conn: yield conn`, memanfaatkan ConnectionPool yang sama seperti pada Q14, dan diinjeksikan lewat `Depends(get_conn)`.
 -- Alternatif: membuka `psycopg.connect(DSN)` baru di setiap endpoint; tidak dipilih karena membuka koneksi baru per-request itu mahal dan menghilangkan manfaat pooling yang sudah dibangun di Q14.
@@ -620,6 +756,7 @@ def get_conn():
 ```
 
 Endpoint memakainya sebagai dependency:
+
 ```python
 @app.post("/rentals", response_model=RentalOut, status_code=201)
 def buat_rental(payload: RentalIn, conn: psycopg.Connection = Depends(get_conn)):
@@ -627,6 +764,7 @@ def buat_rental(payload: RentalIn, conn: psycopg.Connection = Depends(get_conn))
 ```
 
 **Keluaran :**
+
 ```
 Dependency ini tidak menghasilkan output tersendiri (tidak dipanggil manual), tetapi terbukti berjalan lewat log server saat menerima request:
 
@@ -640,7 +778,6 @@ Setiap request POST /rentals berhasil mendapat koneksi (tidak ada galat "pool ex
 
 **Alasan :**
 Pola `with pool.connection() as conn: yield conn` memastikan siklus hidup koneksi mengikuti siklus hidup request: FastAPI menjalankan kode sebelum `yield` sebagai setup, menyuntikkan `conn` ke handler, lalu setelah handler selesai (baik return normal maupun exception yang di-raise sebagai HTTPException), FastAPI menutup generator sehingga blok `with pool.connection()` ikut keluar dan mengembalikan koneksi ke pool secara otomatis. Ini mencegah kebocoran koneksi (connection leak) yang bisa terjadi kalau koneksi dibuka manual tanpa jaminan close/return pada semua jalur (termasuk jalur galat).
-
 
 ### Q22 · POST /rentals
 
@@ -666,6 +803,7 @@ def buat_rental(payload: RentalIn, conn: psycopg.Connection = Depends(get_conn))
 ```
 
 **Keluaran :**
+
 ```
 $ curl -s -i -X POST localhost:8000/rentals -H 'content-type: application/json'
 -d '{"customer_id":1,"inventory_id":1,"staff_id":1,"amount":4.99}'
@@ -696,6 +834,7 @@ class RentalIn(BaseModel):
 ```
 
 **Keluaran :**
+
 ```
 $ curl -s -i -X POST localhost:8000/rentals -H 'content-type: application/json'
 -d '{"customer_id":1,"inventory_id":1,"staff_id":1,"amount":-4.99}'
@@ -726,6 +865,7 @@ except pg_errors.ForeignKeyViolation:
 ```
 
 **Keluaran :**
+
 ```
 $ curl -s -i -X POST localhost:8000/rentals -H 'content-type: application/json'
 -d '{"customer_id":1,"inventory_id":999999,"staff_id":1,"amount":4.99}'
@@ -740,54 +880,63 @@ Log server: `INFO: 127.0.0.1:55420 - "POST /rentals HTTP/1.1" 409 Conflict`
 **Alasan :**
 Status 409 Conflict dipilih karena requestnya sendiri valid secara bentuk (format JSON dan tipe data benar), tetapi bertentangan dengan keadaan data saat ini (inventory_id 999999 tidak eksis) — ini beda konteks dengan 422 (galat bentuk/nilai input) maupun 404 (resource endpoint tidak ada). Karena kesalahan referensi baru bisa dipastikan setelah procedure dieksekusi di database (constraint FK adalah sumber kebenaran terakhir soal data yang benar-benar ada), penanganannya wajib di lapisan except setelah CALL, bukan di Pydantic. Pesan yang dikembalikan sengaja digeneralisasi (tidak menyebut FK/tabel mana persis yang gagal) agar klien tetap tahu ada masalah referensi tanpa mengetahui detail skema database.
 
-
 ## Reflektif A
+
 Setelah Q3 dan Q4, siapa yang memulai transaksi, siapa yang mengakhirinya, dan bagaimana kelompok membuktikannya dari data?
->> Siapa yang memulai transaksi?
-Transaksi dimulai oleh klien atau aplikasi pemanggil eksternal. Setiap kali koneksi membuka eksekusi perintah atau pemanggilan prosedur (CALL), sesi klien otomatis bertindak sebagai pengendali awal transaksi.
 
->> Siapa yang mengakhirinya?
-Transaksi diakhiri oleh klien pemanggil (melalui perintah commit() atau rollback() di Python, atau COMMIT/ROLLBACK otomatis/manual di level sesi). Prosedur PL/pgSQL sendiri tidak boleh mengakhiri transaksi (tidak boleh ada COMMIT atau ROLLBACK di dalam prosedur), karena jika dipaksa (seperti pada Q4), PostgreSQL akan langsung menolak dan memunculkan galat invalid transaction termination.
+> > Siapa yang memulai transaksi?
+> > Transaksi dimulai oleh klien atau aplikasi pemanggil eksternal. Setiap kali koneksi membuka eksekusi perintah atau pemanggilan prosedur (CALL), sesi klien otomatis bertindak sebagai pengendali awal transaksi.
 
->> Bagaimana kelompok membuktikannya dari data?
-Kelompok membuktikannya melalui dua skenario pengujian utama:
+> > Siapa yang mengakhirinya?
+> > Transaksi diakhiri oleh klien pemanggil (melalui perintah commit() atau rollback() di Python, atau COMMIT/ROLLBACK otomatis/manual di level sesi). Prosedur PL/pgSQL sendiri tidak boleh mengakhiri transaksi (tidak boleh ada COMMIT atau ROLLBACK di dalam prosedur), karena jika dipaksa (seperti pada Q4), PostgreSQL akan langsung menolak dan memunculkan galat invalid transaction termination.
 
->> Pengujian Q3 (Pembuktian Rollback): Saat prosedur dipanggil dengan parameter negatif (p_amount = -4.99), prosedur langsung memicu RAISE EXCEPTION. Ketika koneksi di-rollback lewat eksekusi luar, jumlah baris pada tabel lab5.rental_tx tetap sama (tidak bertambah), membuktikan bahwa seluruh rangkaian perubahan data dibatalkan secara atomik.
+> > Bagaimana kelompok membuktikannya dari data?
+> > Kelompok membuktikannya melalui dua skenario pengujian utama:
 
->> Pengujian Q4 (Pembuktian Batas Transaksi): Saat prosedur yang disisipi perintah COMMIT dipanggil dari dalam blok transaksi Python (with psycopg.connect(...)), terminal langsung mengeluarkan galat invalid transaction termination. Hal ini membuktikan bahwa prosedur tidak memiliki hak untuk mengatur transaksi jika dipanggil dari konteks eksternal.
+> > Pengujian Q3 (Pembuktian Rollback): Saat prosedur dipanggil dengan parameter negatif (p_amount = -4.99), prosedur langsung memicu RAISE EXCEPTION. Ketika koneksi di-rollback lewat eksekusi luar, jumlah baris pada tabel lab5.rental_tx tetap sama (tidak bertambah), membuktikan bahwa seluruh rangkaian perubahan data dibatalkan secara atomik.
+
+> > Pengujian Q4 (Pembuktian Batas Transaksi): Saat prosedur yang disisipi perintah COMMIT dipanggil dari dalam blok transaksi Python (with psycopg.connect(...)), terminal langsung mengeluarkan galat invalid transaction termination. Hal ini membuktikan bahwa prosedur tidak memiliki hak untuk mengatur transaksi jika dipanggil dari konteks eksternal.
 
 ## Reflektif B
-Pilih tags atau metadata. Apakah sebaiknya tetap di sana atau dipindahkan menjadi tabel? Berikan satu pertanyaan bisnis yang dapat mengubah keputusan tersebut.
->> Untuk kebutuhan sistem saat ini, tags sebaiknya tetap disimpan di tabel rental_tx sebagai tipe data text[] (array), bukan dipisah ke tabel relasi baru (rental_tags). Alasannya yaitu tags berfungsi sebagai metadata/label sederhana tanpa atribut tambahan (seperti created_at, deskripsi tag, atau created_by), lalu mencegah operasi JOIN tambahan saat aplikasi membaca transaksi penyewaan, dan PostgreSQL memiliki indeks GIN (Generalized Inverted Index) yang efisien jika pencarian tag di dalam array memerlukan optimasi di masa mendatang.
 
->> Pertanyaan bisnis yang dapat mengubah keputusan yaitu, "Apakah tim manajemen memerlukan analitik terpusat mengenai daftar master tag resmi beserta pembatasan hak akses dan laporan statistik penggunaan tag lintas seluruh modul sistem?". Jika jawabannya Ya, maka tags wajib dipindahkan ke tabel master tersendiri (misal: lab5.tag dan lab5.rental_tag) untuk menjaga integritas data (menghindari ketidakkonsistenan akibat typo seperti 'promo' vs 'promosi') dan mempermudah agregasi.
+Pilih tags atau metadata. Apakah sebaiknya tetap di sana atau dipindahkan menjadi tabel? Berikan satu pertanyaan bisnis yang dapat mengubah keputusan tersebut.
+
+> > Untuk kebutuhan sistem saat ini, tags sebaiknya tetap disimpan di tabel rental_tx sebagai tipe data text[] (array), bukan dipisah ke tabel relasi baru (rental_tags). Alasannya yaitu tags berfungsi sebagai metadata/label sederhana tanpa atribut tambahan (seperti created_at, deskripsi tag, atau created_by), lalu mencegah operasi JOIN tambahan saat aplikasi membaca transaksi penyewaan, dan PostgreSQL memiliki indeks GIN (Generalized Inverted Index) yang efisien jika pencarian tag di dalam array memerlukan optimasi di masa mendatang.
+
+> > Pertanyaan bisnis yang dapat mengubah keputusan yaitu, "Apakah tim manajemen memerlukan analitik terpusat mengenai daftar master tag resmi beserta pembatasan hak akses dan laporan statistik penggunaan tag lintas seluruh modul sistem?". Jika jawabannya Ya, maka tags wajib dipindahkan ke tabel master tersendiri (misal: lab5.tag dan lab5.rental_tag) untuk menjaga integritas data (menghindari ketidakkonsistenan akibat typo seperti 'promo' vs 'promosi') dan mempermudah agregasi.
 
 ## Reflektif C
+
 Bandingkan rollback Q3 yang dipicu basis data dan Q13 yang dipicu Python. Apa persamaannya, dan apa satu hal yang hanya dapat dilakukan sisi aplikasi?
->> Rollback pada Q3 dipicu oleh database: RAISE EXCEPTION di dalam lab5.process_rental ketika p_amount negatif, sehingga Postgres sendiri yang membatalkan transaksi sebelum baris apapun tersimpan. Rollback pada Q13 dipicu oleh aplikasi: prosedurnya sendiri berhasil dijalankan tanpa error SQL, tapi RuntimeError di kode Python membuat context manager with psycopg.connect(...) memanggil rollback() sebelum sempat commit().
 
->> Persamaannya: keduanya sama-sama memanfaatkan sifat atomik transaksi Postgres — begitu satu blok transaksi dibatalkan (apapun pemicunya), seluruh perubahan multi-INSERT di dalamnya (baik rental_tx maupun payment_tx) ikut batal bersama, tidak ada data setengah jadi yang tertinggal.
+> > Rollback pada Q3 dipicu oleh database: RAISE EXCEPTION di dalam lab5.process_rental ketika p_amount negatif, sehingga Postgres sendiri yang membatalkan transaksi sebelum baris apapun tersimpan. Rollback pada Q13 dipicu oleh aplikasi: prosedurnya sendiri berhasil dijalankan tanpa error SQL, tapi RuntimeError di kode Python membuat context manager with psycopg.connect(...) memanggil rollback() sebelum sempat commit().
 
->> Satu hal yang hanya bisa dilakukan sisi aplikasi: membatalkan transaksi berdasarkan kondisi yang tidak diketahui oleh database — misalnya gagalnya pemanggilan API eksternal, aturan bisnis yang butuh data di luar database, atau keputusan berdasarkan hasil beberapa query terpisah. Database tidak bisa tahu hal-hal ini karena validasinya (RAISE EXCEPTION) hanya bisa melihat data yang ada di dalam query/prosedur itu sendiri, sedangkan aplikasi bisa menggabungkan logika dari mana saja sebelum memutuskan commit atau rollback.
+> > Persamaannya: keduanya sama-sama memanfaatkan sifat atomik transaksi Postgres — begitu satu blok transaksi dibatalkan (apapun pemicunya), seluruh perubahan multi-INSERT di dalamnya (baik rental_tx maupun payment_tx) ikut batal bersama, tidak ada data setengah jadi yang tertinggal.
+
+> > Satu hal yang hanya bisa dilakukan sisi aplikasi: membatalkan transaksi berdasarkan kondisi yang tidak diketahui oleh database — misalnya gagalnya pemanggilan API eksternal, aturan bisnis yang butuh data di luar database, atau keputusan berdasarkan hasil beberapa query terpisah. Database tidak bisa tahu hal-hal ini karena validasinya (RAISE EXCEPTION) hanya bisa melihat data yang ada di dalam query/prosedur itu sendiri, sedangkan aplikasi bisa menggabungkan logika dari mana saja sebelum memutuskan commit atau rollback.
 
 ## Reflektif D
-Untuk Q20, versi mana yang dipilih jika kode dibaca ulang tim enam bulan lagi? Dukung jawaban dengan angka. Sebutkan pula keadaan ketika joinedload lebih tepat dari selectinload.
->> Untuk Q20, saya memilih versi ORM karena lebih mudah dibaca dan dipahami dari struktur programnya. Walaupun waktu ORM adalah 0.017044 detik, sedangkan SQL mentah 0.009961 detik, keduanya menghasilkan data yang sama. Selain itu, ORM lebih mudah digunakan jika query nantinya perlu dikembangkan atau disesuaikan dengan model yang sudah ada.
 
->> joinedload lebih cocok digunakan ketika data utama dan data relasi ingin diambil secara bersamaan. Pada Q19, joinedload hanya menggunakan 1 SELECT, sedangkan selectinload pada Q18 menggunakan 2 SELECT. Jadi, joinedload bisa dipilih ketika pengambilan data dalam satu query masih sesuai dengan kebutuhan.
+Untuk Q20, versi mana yang dipilih jika kode dibaca ulang tim enam bulan lagi? Dukung jawaban dengan angka. Sebutkan pula keadaan ketika joinedload lebih tepat dari selectinload.
+
+> > Untuk Q20, saya memilih versi ORM karena lebih mudah dibaca dan dipahami dari struktur programnya. Walaupun waktu ORM adalah 0.017044 detik, sedangkan SQL mentah 0.009961 detik, keduanya menghasilkan data yang sama. Selain itu, ORM lebih mudah digunakan jika query nantinya perlu dikembangkan atau disesuaikan dengan model yang sudah ada.
+
+> > joinedload lebih cocok digunakan ketika data utama dan data relasi ingin diambil secara bersamaan. Pada Q19, joinedload hanya menggunakan 1 SELECT, sedangkan selectinload pada Q18 menggunakan 2 SELECT. Jadi, joinedload bisa dipilih ketika pengambilan data dalam satu query masih sesuai dengan kebutuhan.
 
 ## Reflektif E
-Untuk nilai negatif, validasi dipasang di Pydantic dan domain basis data. Jelaskan apa yang hilang jika salah satunya dihapus, untuk kedua arah.
->> Jika validasi Pydantic (`Field(gt=0)`) dihapus, hanya mengandalkan domain `lab5.positive_amount`:
-Request dengan amount negatif tidak lagi ditolak di gerbang API, melainkan lolos sampai `CALL lab5.process_rental(...)` benar-benar dieksekusi ke database. Prosedur baru menolaknya lewat `RAISE EXCEPTION` (SQLSTATE 22003), yang di endpoint ditangkap oleh `except pg_errors.NumericValueOutOfRange` dan tetap diterjemahkan jadi 422 — jadi secara perilaku HTTP hasil akhirnya masih benar. Namun yang hilang adalah *kecepatan dan efisiensi umpan balik*: setiap request salah kini harus sempat meminjam koneksi dari pool, membuka transaksi, dan mengirim perintah ke server database dulu sebelum tahu request itu salah — padahal kesalahannya sebenarnya bisa dideteksi tanpa menyentuh jaringan sama sekali. Selain itu, validasi jadi bergantung penuh pada satu blok except yang harus selalu dijaga cocok dengan SQLSTATE yang dilempar prosedur; kalau lupa ditangkap dengan tepat, galat itu jatuh ke `except psycopg.Error` generik dan klien menerima 500, bukan 422.
 
->> Jika domain `lab5.positive_amount` dihapus, hanya mengandalkan Pydantic:
-Endpoint FastAPI ini sendiri tetap aman, karena `Field(gt=0)` masih menolak nilai negatif sebelum sampai ke database. Yang hilang adalah *perlindungan di luar jalur endpoint ini*. Kolom `amount` pada tabel `payment_tx` jadi hanya dijaga oleh satu titik masuk (endpoint /rentals) — kalau di masa depan ada skrip migrasi, tool admin, laporan batch, atau layanan lain yang menulis langsung ke `payment_tx` (lewat psql, ORM lain, atau bug di endpoint baru yang lupa memberi validasi), tidak ada lagi jaring pengaman yang mencegah nilai nol atau negatif tersimpan. Inilah alasan kedua lapisan tetap dipasang sekaligus (defense-in-depth): Pydantic menjaga *pengalaman* klien API supaya cepat dan jelas, sedangkan domain basis data menjaga *kebenaran data* itu sendiri apa pun jalur atau aplikasi yang menulis ke tabel tersebut.
+Untuk nilai negatif, validasi dipasang di Pydantic dan domain basis data. Jelaskan apa yang hilang jika salah satunya dihapus, untuk kedua arah.
+
+> > Jika validasi Pydantic (`Field(gt=0)`) dihapus, hanya mengandalkan domain `lab5.positive_amount`:
+> > Request dengan amount negatif tidak lagi ditolak di gerbang API, melainkan lolos sampai `CALL lab5.process_rental(...)` benar-benar dieksekusi ke database. Prosedur baru menolaknya lewat `RAISE EXCEPTION` (SQLSTATE 22003), yang di endpoint ditangkap oleh `except pg_errors.NumericValueOutOfRange` dan tetap diterjemahkan jadi 422 — jadi secara perilaku HTTP hasil akhirnya masih benar. Namun yang hilang adalah _kecepatan dan efisiensi umpan balik_: setiap request salah kini harus sempat meminjam koneksi dari pool, membuka transaksi, dan mengirim perintah ke server database dulu sebelum tahu request itu salah — padahal kesalahannya sebenarnya bisa dideteksi tanpa menyentuh jaringan sama sekali. Selain itu, validasi jadi bergantung penuh pada satu blok except yang harus selalu dijaga cocok dengan SQLSTATE yang dilempar prosedur; kalau lupa ditangkap dengan tepat, galat itu jatuh ke `except psycopg.Error` generik dan klien menerima 500, bukan 422.
+
+> > Jika domain `lab5.positive_amount` dihapus, hanya mengandalkan Pydantic:
+> > Endpoint FastAPI ini sendiri tetap aman, karena `Field(gt=0)` masih menolak nilai negatif sebelum sampai ke database. Yang hilang adalah _perlindungan di luar jalur endpoint ini_. Kolom `amount` pada tabel `payment_tx` jadi hanya dijaga oleh satu titik masuk (endpoint /rentals) — kalau di masa depan ada skrip migrasi, tool admin, laporan batch, atau layanan lain yang menulis langsung ke `payment_tx` (lewat psql, ORM lain, atau bug di endpoint baru yang lupa memberi validasi), tidak ada lagi jaring pengaman yang mencegah nilai nol atau negatif tersimpan. Inilah alasan kedua lapisan tetap dipasang sekaligus (defense-in-depth): Pydantic menjaga _pengalaman_ klien API supaya cepat dan jelas, sedangkan domain basis data menjaga _kebenaran data_ itu sendiri apa pun jalur atau aplikasi yang menulis ke tabel tersebut.
 
 ## Di Mana Aturan Itu Tinggal
 
-| Aturan | Lapisan | Risiko bila dipindahkan | Bukti |
-| ------ | ------- | ----------------------- | ------|
+| Aturan                                                | Lapisan               | Risiko bila dipindahkan                                                       | Bukti                                     |
+| ----------------------------------------------------- | --------------------- | ----------------------------------------------------------------------------- | ----------------------------------------- |
 | Pembayaran tidak boleh bernilai nol atau negatif      | Domain (DB)           | Data yang tidak valid bisa masuk ke database.                                 | Q6 (Domain menolak nilai nol dan negatif) |
 | Rental dan payment diproses dalam satu transaksi      | Procedure (PL/pgSQL)  | Data bisa tidak konsisten jika salah satu proses gagal.                       | Q3 (Rollback saat payment gagal)          |
 | Query harus menggunakan parameter                     | Application (psycopg) | Query bisa rentan terhadap SQL injection jika input langsung digabung ke SQL. | Q10–Q11 (Parameterized query)             |
@@ -796,10 +945,10 @@ Endpoint FastAPI ini sendiri tetap aman, karena `Field(gt=0)` masih menolak nila
 
 ## Ringkasan N+1
 
-|  Q17  |  Q18  |  Q19  | Penafsiran |
-| ----: | ----: | ----: | ---------- |
+|       Q17 |      Q18 |      Q19 | Penafsiran                                                                                                                                                                                                                                                                                                                     |
+| --------: | -------: | -------: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | 11 SELECT | 2 SELECT | 1 SELECT | Q17 menggunakan **lazy loading**, sehingga rental diambil satu per satu saat `c.rentals` diakses dan menghasilkan N+1 query. Q18 menggunakan `selectinload` untuk mengambil rental dengan query tambahan menggunakan `IN`, sedangkan Q19 menggunakan `joinedload` untuk mengambil customer dan rental sekaligus dengan `JOIN`. |
 
 ## Penggunaan AI dan Verifikasi
-Dalam latihan ini, kami menggunakan AI untuk membantu memahami konsep-konsep yang sedang diajarkan, terutama dalam memahami struktur kode Python. Kami juga menggunakan AI saat mengalami beberapa kendala, seperti melakukan debugging pada program, salah menggunakan database yang seharusnya `pagila` tetapi menggunakan `latihan`, serta saat menjalankan program dan memahami output yang dihasilkan. Setelah mendapat bantuan dari AI, kami tetap melakukan pengecekan dan memastikan hasil akhirnya sendiri.
 
+Dalam latihan ini, kami menggunakan AI untuk membantu memahami konsep-konsep yang lagi diajarkan, terutama dalam memahami struktur kode python. Kami juga pakai AI saat debugging karena banyak error dan salah sintaks, salah menggunakan database yang seharusnya pagila tetapi menggunakan latihan, serta saat menjalankan program dan memahami output yang dihasilkan. Setelah mendapat bantuan dari AI, kami tetap melakukan pengecekan dan memastikan hasil akhirnya sendiri.
