@@ -165,5 +165,5 @@ if __name__ == "__main__":
 
     q17_n_plus_one()
     q18_selectinload()
-    # q19_joinedload()
-    # q20_comparison()
+    q19_joinedload()
+    q20_comparison()
