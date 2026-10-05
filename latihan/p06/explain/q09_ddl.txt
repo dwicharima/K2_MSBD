@@ -1,0 +1,9 @@
+DROP INDEX
+CREATE INDEX
+ANALYZE
+INSERT 0 1
+    index     | ukuran |  bytes   
+--------------+--------+----------
+ ev_benar_idx | 60 MB  | 63102976
+(1 row)
+

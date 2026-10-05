@@ -1,0 +1,39 @@
+===== RUN 1 =====
+                                                           QUERY PLAN                                                           
+--------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using ev_cover_idx on event_log  (cost=0.43..9.02 rows=34 width=18) (actual time=0.013..0.018 rows=20 loops=1)
+   Index Cond: (customer_id = 4211)
+   Heap Fetches: 0
+   Buffers: shared hit=5
+ Planning:
+   Buffers: shared hit=149
+ Planning Time: 0.271 ms
+ Execution Time: 0.062 ms
+(8 rows)
+
+===== RUN 2 =====
+                                                           QUERY PLAN                                                           
+--------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using ev_cover_idx on event_log  (cost=0.43..9.02 rows=34 width=18) (actual time=0.015..0.021 rows=20 loops=1)
+   Index Cond: (customer_id = 4211)
+   Heap Fetches: 0
+   Buffers: shared hit=5
+ Planning:
+   Buffers: shared hit=149
+ Planning Time: 0.321 ms
+ Execution Time: 0.063 ms
+(8 rows)
+
+===== RUN 3 =====
+                                                           QUERY PLAN                                                           
+--------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using ev_cover_idx on event_log  (cost=0.43..9.02 rows=34 width=18) (actual time=0.014..0.020 rows=20 loops=1)
+   Index Cond: (customer_id = 4211)
+   Heap Fetches: 0
+   Buffers: shared hit=5
+ Planning:
+   Buffers: shared hit=149
+ Planning Time: 0.297 ms
+ Execution Time: 0.059 ms
+(8 rows)
+

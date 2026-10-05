@@ -1,0 +1,36 @@
+===== RUN 1 =====
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using ev_email_lower_idx on event_log  (cost=0.43..8.45 rows=1 width=32) (actual time=0.076..0.077 rows=1 loops=1)
+   Index Cond: (lower(email) = 'user1234567@contoh.ac.id'::text)
+   Buffers: shared read=4
+ Planning:
+   Buffers: shared hit=125
+ Planning Time: 0.327 ms
+ Execution Time: 0.124 ms
+(7 rows)
+
+===== RUN 2 =====
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using ev_email_lower_idx on event_log  (cost=0.43..8.45 rows=1 width=32) (actual time=0.016..0.017 rows=1 loops=1)
+   Index Cond: (lower(email) = 'user1234567@contoh.ac.id'::text)
+   Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=125
+ Planning Time: 0.324 ms
+ Execution Time: 0.061 ms
+(7 rows)
+
+===== RUN 3 =====
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Index Scan using ev_email_lower_idx on event_log  (cost=0.43..8.45 rows=1 width=32) (actual time=0.019..0.019 rows=1 loops=1)
+   Index Cond: (lower(email) = 'user1234567@contoh.ac.id'::text)
+   Buffers: shared hit=4
+ Planning:
+   Buffers: shared hit=125
+ Planning Time: 0.279 ms
+ Execution Time: 0.071 ms
+(7 rows)
+
