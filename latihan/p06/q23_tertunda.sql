@@ -1,4 +1,0 @@
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT *
-FROM lab6.event_log
-WHERE status = 'TERTUNDA';

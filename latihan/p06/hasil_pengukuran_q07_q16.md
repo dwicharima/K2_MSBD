@@ -8,3 +8,4 @@
 | q14_sebelum_vacuum | 0.061 | 0.062 | 0.143 / 0.061 / 0.062 | Buffers: shared hit=8 |
 | q14_sesudah_vacuum | 0.059 | 0.062 | 0.062 / 0.063 / 0.059 | Buffers: shared hit=5 |
 | q15_tiga | 0.056 | 0.068 | 0.068 / 0.056 / 0.075 | Buffers: shared hit=6 |
+| q23_gagal | 208.158 |	214.294 | 208.158 / 214.294 / 228.644 |	shared read=39966 |

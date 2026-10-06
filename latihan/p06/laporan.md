@@ -112,7 +112,6 @@ UPDATE 2000000
 (2 rows)
 
 
-
 $ docker exec -it msbd-pg psql -U msbd -d pagila -c "
 ANALYZE lab6.hot_penuh;
 ANALYZE lab6.hot_longgar;
@@ -277,6 +276,75 @@ Execution Time: 0.075 ms
 Mengapa Heap Fetches berubah setelah VACUUM walau definisi index tidak berubah?
 >> Index-Only Scan hanya boleh melewati heap untuk halaman yang ditandai all-visible pada visibility map; untuk halaman lain PostgreSQL harus mengunjungi heap guna memeriksa apakah tuple terlihat oleh transaksi, dan kunjungan itu dihitung sebagai Heap Fetches. Setelah `UPDATE` pada 20 baris customer 4211, halaman-halaman itu kehilangan tanda all-visible sehingga Heap Fetches = **20** (Buffers 8). VACUUM membersihkan tuple mati dan menandai kembali halaman tersebut sebagai all-visible, sehingga Heap Fetches turun menjadi **0** (Buffers 5) meskipun definisi index tidak berubah. Jadi manfaat covering index bergantung pada kesehatan visibility map, yaitu seberapa rutin VACUUM berjalan, bukan hanya pada definisi index.
 
+### Q22
+**Perintah :**
+```
+CREATE INDEX event_log_status_idx
+ON lab6.event_log(status);
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM lab6.event_log
+WHERE status = 'SUKSES';
+
+EXPLAIN (ANALYZE, BUFFERS)
+SELECT * FROM lab6.event_log
+WHERE status = 'GAGAL';
+```
+
+**Keluaran :**
+```
+docker compose exec -T postgres psql -U msbd -d latihan < latihan/p06/q22_sukses.sql
+                                                      QUERY PLAN                                                       
+-----------------------------------------------------------------------------------------------------------------------
+ Seq Scan on event_log  (cost=0.00..83567.15 rows=1673277 width=194) (actual time=0.896..604.962 rows=1680000 loops=1)
+   Filter: (status = 'SUKSES'::text)
+   Rows Removed by Filter: 320000
+   Buffers: shared hit=16232 read=42335
+ Planning:
+   Buffers: shared hit=145 read=42
+ Planning Time: 23.118 ms
+ Execution Time: 689.253 ms
+(8 rows)
+
+
+docker compose exec -T postgres psql -U msbd -d latihan < latihan/p06/q22_gagal.sql
+  QUERY PLAN                                                               
+----------------------------------------------------------------------------------------------------------------------------------
+ Bitmap Heap Scan on event_log  (cost=453.53..56576.19 rows=40400 width=194) (actual time=21.353..246.155 rows=40000 loops=1)
+   Recheck Cond: (status = 'GAGAL'::text)
+   Heap Blocks: exact=39930
+   Buffers: shared read=39966
+   ->  Bitmap Index Scan on event_log_status_idx  (cost=0.00..443.43 rows=40400 width=0) (actual time=9.996..9.998 rows=40000 loops=1)
+         Index Cond: (status = 'GAGAL'::text)
+         Buffers: shared read=36
+ Planning:
+   Buffers: shared hit=145 read=42
+ Planning Time: 1.267 ms
+ Execution Time: 250.751 ms
+(11 rows)
+
+```
+
+### Q23
+**Perintah :**
+```
+SELECT status, COUNT(*) AS jumlah,
+       ROUND(COUNT(*) * 100.0 / SUM(COUNT(*)) OVER (), 2) AS fraksi_persen
+FROM lab6.event_log
+GROUP BY status
+ORDER BY status;
+```
+
+**Keluaran :**
+```
+docker compose exec -T postgres psql -U msbd -d latihan < latihan/p06/q23_fraksi_status.sql
+  status  | jumlah  | fraksi_persen 
+----------+---------+---------------
+ GAGAL    |   40000 |          2.00
+ SUKSES   | 1680000 |         84.00
+ TERTUNDA |  280000 |         14.00
+(3 rows)
+```
 ---
 
 ## Baris untuk "Tabel Perbandingan" (bagian Q7–Q16)
