@@ -297,3 +297,77 @@ Mengapa Heap Fetches berubah setelah VACUUM walau definisi index tidak berubah?
 - Verifikasi: semua perintah dijalankan sendiri pada PostgreSQL 17.11 di Docker; seluruh angka diambil dari keluaran EXPLAIN pada `explain/`, bukan dari AI. Setiap query dijalankan 3 kali dengan `max_parallel_workers_per_gather = 0` dan BUFFERS. Dugaan awal AI bahwa `ev_salah_idx` tidak akan dipakai ternyata salah menurut hasil kami (index dipakai tetapi memindai separuh index), dan jawaban Q8 kami sesuaikan dengan hasil tersebut.
 - Pengukuran awal Q8–Q15 sempat tidak valid karena perintah pembuat index tidak terjalankan akibat fungsi shell yang hilang; seluruh hasil itu dibuang dan Q8–Q15 diukur ulang dari awal.
 - Penyimpangan prosedur: kondisi "sebelum VACUUM" pada Q14 dibuat dengan UPDATE terkontrol karena autovacuum sudah membersihkan tabel setelah pemuatan data.
+
+# Langkah 5 · Q17–Q21 (GIN untuk JSONB/Array dan BRIN untuk Waktu)
+
+# Jalankan dari ROOT repo. Salin semua berkas .sql di folder ini ke latihan/p06/ lebih dulu.
+
+set -euo pipefail
+P=latihan/p06
+bash $P/p.sh -f $P/q16b_buat_index_langkah5.sql
+bash $P/p.sh -f $P/q17_ukuran.sql
+bash $P/ukur.sh q17_gin_jsonb q17_gin_jsonb.sql
+bash $P/ukur.sh q17_tanpa_gin q17_tanpa_gin.sql
+bash $P/p.sh -f $P/q18_ukuran.sql
+bash $P/ukur.sh q18_gin_tags q18_gin_tags.sql
+bash $P/ukur.sh q18_tanpa_gin q18_tanpa_gin.sql
+bash $P/p.sh -c "ANALYZE lab6.event_log;"
+bash $P/p.sh -f $P/q19_korelasi_ukuran.sql
+bash $P/ukur.sh q20_brin q20_brin.sql
+bash $P/ukur.sh q20_btree q20_btree.sql
+
+### Q17
+
+Uji `payload @> '{"promo": true}'`. Apakah GIN dipakai dan bagaimana ukurannya dibanding heap?
+
+> > GIN **dipakai**: rencana berupa **Bitmap Index Scan on event_log_payload_idx** lalu **Bitmap Heap Scan** (Recheck Cond `payload @> '{"promo": true}'`), estimasi baris 80.402, nyata **80.000** (4,00% dari 2 juta). Tanpa GIN rencananya Seq Scan (Rows Removed by Filter 1.920.000). Waktu tercepat/median dengan GIN sekitar **266 / 276 ms** dibanding **543 / 555 ms** tanpa GIN (kira-kira 2 kali lebih cepat). Ukuran `event_log_payload_idx` (jsonb_path_ops) = **7.266.304 byte (7.096 kB)**, atau **1,51%** dari heap (**479.797.248 byte, 458 MB**). Keuntungannya hanya sekitar 2 kali karena baris promo (setiap baris ke-25) tersebar merata: dengan ±34 baris per halaman hampir setiap halaman memuat satu baris promo, sehingga Bitmap Heap Scan tetap membaca **semua 58.569 halaman** (`Heap Blocks: exact=58569`). GIN menghemat evaluasi filter jsonb per baris, bukan I/O heap.
+
+Keluaran : `explain/q17_gin_jsonb.txt`, `explain/q17_tanpa_gin.txt`
+
+### Q18
+
+Uji keanggotaan tags dengan `@>`; bandingkan rencana dengan dan tanpa GIN.
+
+> > Query: `tags @> ARRAY['kanal:1','sumber:2']` (**166.667 baris, 8,33%**). Dengan GIN: **Bitmap Index Scan on event_log_tags_idx** + Bitmap Heap Scan (`Heap Blocks: exact=58569`), waktu tercepat/median sekitar **280 / 281 ms**. Tanpa GIN (index dihapus dalam transaksi lalu di-ROLLBACK): **Seq Scan** dengan `Rows Removed by Filter` 1.833.333, sekitar **536 / 548 ms**. Ukuran `event_log_tags_idx` = **4.664 kB** (±1% heap). Pola sama dengan Q17: GIN mempercepat sekitar 2 kali, tetapi karena 8,33% baris tersebar di semua halaman, pembacaan heap tidak berkurang (Buffers ±58,8 ribu vs ±58,6 ribu). GIN paling berguna jika nilai yang dicari langka (sangat selektif) atau elemen yang dicari banyak sehingga irisan hasilnya kecil.
+
+Keluaran : `explain/q18_gin_tags.txt`, `explain/q18_tanpa_gin.txt`
+
+### Q19
+
+Periksa correlation `terjadi_pada` di pg_stats dan bandingkan ukuran BRIN dengan B-Tree pada kolom sama.
+
+> > `pg_stats.correlation` untuk `terjadi_pada` = **1** (urutan fisik baris di heap persis searah dengan nilai kolom, karena data dimasukkan berurutan waktu 13 detik sekali). Ukuran: **BRIN (pages_per_range=128) = 32.768 byte (32 kB, 4 halaman)**, **B-Tree polos = 44.949.504 byte (43 MB, 5.487 halaman)**. BRIN hanya **0,073%** dari ukuran B-Tree (B-Tree **±1.372 kali** lebih besar). BRIN cukup menyimpan satu ringkasan min/max per 128 halaman heap (58.569/128 ≈ 458 rentang), sedangkan B-Tree menyimpan satu entri per baris (2 juta).
+
+Keluaran : `q19_korelasi_ukuran.sql`
+
+### Q20
+
+Uji rentang tujuh hari dengan BRIN dan B-Tree. Catat pemenang serta selisih Buffers.
+
+> > Query: `terjadi_pada >= '2024-03-01 00:00+07' AND < '2024-03-08 00:00+07'` (**46.523 baris**, ±2,3%). BRIN: **Bitmap Index Scan** + Bitmap Heap Scan (**lossy=1.536** blok, Rows Removed by Index Recheck 6.103), Buffers **1.546**, median **±14,3 ms**. B-Tree: **Index Scan using ev_terjadi_plain_idx**, Buffers **1.665**, median **±13,6 ms**. **Pemenang waktu: B-Tree**, tetapi tipis (±0,7 ms, ±5%, mendekati noise). Selisih Buffers: BRIN lebih sedikit **±119 buffers (±7%)**, karena B-Tree harus membaca ±130 halaman index sedangkan BRIN hanya ±10 halaman. Karena correlation = 1, tujuh hari data menempati blok heap yang berdekatan (±1.536 halaman) sehingga BRIN hampir tidak membaca halaman berlebih. Bila kedua index ada, planner memilih B-Tree (cost 2.755 vs 59.071 untuk BRIN).
+
+Keluaran : `explain/q20_brin.txt`, `explain/q20_btree.txt`
+
+### Q21 (Reflektif)
+
+Kapan penghematan ukuran BRIN sepadan dengan selisih waktunya?
+
+> > Pada data kami BRIN menghemat **±43 MB (99,93%)** dengan harga waktu hanya **±0,7 ms (±5%)** pada rentang 7 hari, bahkan Buffers-nya lebih sedikit; jadi penghematan itu **sepadan** bila (1) **correlation mendekati ±1** (data append-only berurutan waktu seperti log, sensor, atau transaksi), sehingga rentang nilai tiap blok sempit dan tidak ada halaman berlebih yang dibaca; (2) query berupa **rentang lebar** (hari hingga bulan) yang memang membaca banyak baris; (3) tabel sangat besar atau penyimpanan/waktu pemeliharaan index penting, karena BRIN murah dibuat dan hampir tanpa biaya saat INSERT. Penghematan **tidak sepadan** bila correlation rendah (data diacak atau sering di-UPDATE/DELETE sehingga urutan fisik rusak; BRIN memindai banyak blok lossy), bila query berupa **pencarian titik atau rentang sangat sempit** (B-Tree hanya menyentuh beberapa halaman, BRIN tetap membaca seluruh blok dalam rentang 128 halaman), atau bila butuh ORDER BY/LIMIT atau Index-Only Scan yang tidak dapat dilayani BRIN. Catatan: `pages_per_range` yang lebih kecil membuat BRIN lebih presisi tetapi lebih besar.
+
+## Baris untuk "Tabel Perbandingan" (bagian Q17–Q21)
+
+| Query/index                                            | Tercepat   | Median     | Buffers | Ukuran   | Keputusan                                                                                                                                                                                                        |
+| ------------------------------------------------------ | ---------- | ---------- | ------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Q17 payload @> ... tanpa GIN (Seq Scan)                | 542,875 ms | 555,418 ms | 58.569  | -        | -                                                                                                                                                                                                                |
+| event_log_payload_idx (GIN jsonb_path_ops)             | 266,430 ms | 275,803 ms | 58.590  | 7.096 kB | Dipertahankan bila filter @> pada payload sering dipakai: sekitar 2× lebih cepat, biaya hanya 1,51% dari heap. Peningkatannya kecil karena 4% baris tersebar di semua halaman (58.569 halaman heap tetap dibaca) |
+| Q18 tags @> ... tanpa GIN (Seq Scan)                   | 535,544 ms | 548,047 ms | 58.576  | -        | -                                                                                                                                                                                                                |
+| event_log_tags_idx (GIN)                               | 279,292 ms | 281,271 ms | 58.809  | 4.664 kB | Dipertahankan bila nilai yang dicari selektif; untuk nilai yang cocok dengan 8,33% baris keuntungannya hanya sekitar 2×                                                                                          |
+| event_log_terjadi_pada_idx (BRIN, 128 halaman/rentang) | 13,927 ms  | 14,318 ms  | 1.546   | 32 kB    | Dipertahankan: correlation = 1, ukuran hanya 0,073% dari B-Tree, selisih waktu sekitar 0,7 ms                                                                                                                    |
+| ev_terjadi_plain_idx (B-Tree, rentang 7 hari)          | 13,277 ms  | 13,624 ms  | 1.665   | 43 MB    | Dihapus bila hanya untuk rentang waktu (BRIN sudah cukup); dipertahankan bila perlu ORDER BY/LIMIT atau pencarian titik                                                                                          |
+
+## Penggunaan AI dan Verifikasi (bagian Q17–Q21)
+
+- AI (Claude) dipakai untuk menyusun berkas SQL (`q17_*` sampai `q20_*`), skrip `jalankan_langkah5.sh`, dan draf penjelasan Q17–Q21.
+- Verifikasi: [ISI: semua perintah dijalankan sendiri pada PostgreSQL 17.x di Docker; seluruh angka diambil dari `explain/` dan `hasil_pengukuran_q07_q16.md`, bukan dari AI.] Setiap query dijalankan 3 kali dengan `max_parallel_workers_per_gather = 0` dan BUFFERS.
+- Draf angka dari AI divalidasi pada PostgreSQL 16 dengan data yang sama, lalu diganti dengan hasil ukur kami: [ISI: bagian yang berbeda dari draf dan bagaimana jawabannya disesuaikan].
+- Pengukuran "tanpa GIN" dan "BRIN vs B-Tree" memakai `DROP INDEX` di dalam transaksi yang di-ROLLBACK, sehingga index tidak hilang permanen. Query Q17 dan Q18 memakai `@>` dengan nilai `{"promo": true}` dan `ARRAY['kanal:1','sumber:2']`.
