@@ -371,3 +371,72 @@ Kapan penghematan ukuran BRIN sepadan dengan selisih waktunya?
 - Verifikasi: [ISI: semua perintah dijalankan sendiri pada PostgreSQL 17.x di Docker; seluruh angka diambil dari `explain/` dan `hasil_pengukuran_q07_q16.md`, bukan dari AI.] Setiap query dijalankan 3 kali dengan `max_parallel_workers_per_gather = 0` dan BUFFERS.
 - Draf angka dari AI divalidasi pada PostgreSQL 16 dengan data yang sama, lalu diganti dengan hasil ukur kami: [ISI: bagian yang berbeda dari draf dan bagaimana jawabannya disesuaikan].
 - Pengukuran "tanpa GIN" dan "BRIN vs B-Tree" memakai `DROP INDEX` di dalam transaksi yang di-ROLLBACK, sehingga index tidak hilang permanen. Query Q17 dan Q18 memakai `@>` dengan nilai `{"promo": true}` dan `ARRAY['kanal:1','sumber:2']`.
+
+
+# Langkah 7 · Q27–Q31
+
+### Q27
+Bandingkan INSERT 200000 baris pada tabel tanpa index dan dengan lima index. Nyatakan selisih waktu dalam persen.
+>Membandingkan waktu INSERT 200.000 baris pada tabel tanpa index dan tabel dengan lima index. Berdasarkan konsep pengukuran, tabel dengan lima index akan memiliki pekerjaan tambahan karena setiap baris yang dimasukkan juga harus dicatat ke struktur index. Persentase selisih waktu dihitung menggunakan perbedaan median waktu kedua kondisi. Nilai waktu dan persentase akhir harus diambil dari tiga kali eksekusi PostgreSQL sesuai aturan praktikum.
+
+Format hasil:
+Kondisi	Percobaan 1	Percobaan 2	Percobaan 3	Median
+Tanpa index	1134.556 ms	905.741 ms	897.909 ms	979.402 ms
+5 index	1784.022 ms	1774.872 ms	1760.472 ms	1773.122 ms
+
+Selisih (%) =
+((1773.122 - 979.402)
+ / 979.402) × 100%
+ Hasilnya = 81.04%
+
+
+ ### Q28
+Bandingkan ukuran total tabel pada kedua keadaan.
+>Membandingkan ukuran total tabel pada kondisi tanpa index dan dengan lima index. Tabel dengan lima index dapat memiliki ukuran total lebih besar karena index membutuhkan ruang penyimpanan tambahan. Pengukuran dilakukan menggunakan pg_total_relation_size() sehingga ukuran tabel beserta objek penyimpanan terkait dapat dibandingkan.
+
+kondisi     | ukuran_total 
+----------------+--------------
+ Tanpa index    | 30 MB
+ Dengan 5 index | 51 MB
+(2 rows)
+
+Time: 3.346 ms
+
+
+### Q29
+Daftar seluruh index lab6, idx_scan, dan ukuran. Tentukan index dengan idx_scan nol serta alasan jika tetap harus dipertahankan.
+>Seluruh index pada schema lab6 diperiksa melalui pg_stat_user_indexes. Kolom idx_scan digunakan untuk melihat frekuensi penggunaan setiap index, sedangkan ukuran index diperoleh menggunakan pg_relation_size(). Index dengan idx_scan = 0 tidak langsung berarti harus dihapus karena index tersebut mungkin belum digunakan selama workload pengujian atau masih diperlukan untuk query tertentu.
+
+tabel      |    nama_index    | idx_scan |   ukuran   
+----------------+------------------+----------+------------
+ event_log      | event_log_pkey   |        0 | 8192 bytes
+ event_log_5idx | q27_idx_customer |        0 | 3808 kB
+ event_log_5idx | q27_idx_email    |        0 | 14 MB
+ event_log_5idx | q27_idx_status   |        0 | 1272 kB
+ event_log_5idx | q27_idx_waktu    |        0 | 1272 kB
+ event_log_5idx | q27_idx_wilayah  |        0 | 1272 kB
+(6 rows)
+
+Time: 3.376 ms
+
+
+### Q30
+Susun rekomendasi final: index dipertahankan, dihapus, dan digabung—masing-masing disertai satu angka pengukuran.
+>Rekomendasi index dibuat berdasarkan gabungan hasil pengukuran waktu eksekusi, Buffers, ukuran index, dan idx_scan. Index yang memberikan keuntungan nyata terhadap query dan masih digunakan dapat dipertahankan, sedangkan index yang tidak memberikan manfaat dan memiliki biaya penyimpanan atau penulisan dapat dipertimbangkan untuk dihapus. Jika terdapat index dengan fungsi yang tumpang tindih, penggabungan atau penyederhanaan index dapat dipertimbangkan.
+
+nama_index    |   ukuran   | idx_scan      | keputusan
+------------------+------------+-------------------------
+ q27_idx_email    | 14 MB      |        0 | Hapus
+ q27_idx_customer | 3808 kB    |        0 | Gabung
+ q27_idx_waktu    | 1272 kB    |        0 | Pertahankan
+ q27_idx_status   | 1272 kB    |        0 | Pertahankan
+ q27_idx_wilayah  | 1272 kB    |        0 | Pertahankan
+ event_log_pkey   | 8192 bytes |        0 | Pertahankan
+(6 rows)
+
+Time: 13.414 ms
+
+
+### Q31
+Untuk setiap index yang direkomendasikan dihapus atau dipertahankan, sebutkan satu angka sebagai dasar keputusan.
+>Dasar pengambilan keputusan pada tahap ini adalah hasil pengukuran biaya INSERT, ukuran storage, dan statistik penggunaan index. Median waktu INSERT tanpa index adalah 979,402 ms, sedangkan dengan 5 index adalah 1773,122 ms, sehingga penggunaan 5 index meningkatkan waktu INSERT sekitar 81,04%. Dari sisi storage, tabel tanpa index berukuran 30 MB, sedangkan tabel dengan 5 index berukuran 51 MB, sehingga terdapat tambahan penggunaan storage sebesar 21 MB atau 70%. Sementara itu, seluruh index yang diuji memiliki idx_scan = 0. Karena belum dilakukan pengujian query SELECT yang memanfaatkan index tersebut, hasil idx_scan = 0 digunakan sebagai dasar evaluasi, bukan sebagai alasan langsung untuk menghapus seluruh index.
