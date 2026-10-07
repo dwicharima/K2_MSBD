@@ -1,0 +1,70 @@
+### Q1
+AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
+$ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+ total_saldo 
+-------------
+  2000000.00
+(1 row)
+
+
+### Q2
+AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
+$ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
+BEGIN
+UPDATE 1
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     |  800000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     |  800000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+
+### Q3
+AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
+$ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
+BEGIN
+WARNING:  there is already a transaction in progress
+UPDATE 1
+COMMIT
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     |  800000.00
+           2 | Budi    | 1100000.00
+(2 rows)
+
+BEGIN
+UPDATE 1
+ROLLBACK
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     |  800000.00
+           2 | Budi    | 1100000.00
+(2 rows)
+
+### Q4
+AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
+$ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
+BEGIN
+UPDATE 1
+SAVEPOINT
+UPDATE 1
+ROLLBACK
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     |  850000.00
+           2 | Budi    | 1100000.00
+(2 rows)
+
+COMMIT
