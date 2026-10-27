@@ -68,3 +68,249 @@ ROLLBACK
 (2 rows)
 
 COMMIT
+
+### Q6
+##persiapan
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+UPDATE 2
+
+pagila=# SELECT * FROM lab9.rekening ORDER BY rekening_id;
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+##langkah A
+pagila=# BEGIN;
+SHOW transaction_isolation;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+ transaction_isolation 
+-----------------------
+ read committed
+(1 row)
+
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+##langkah B
+pagila=*# UPDATE lab9.rekening SET saldo = saldo + 100000 WHERE rekening_id = 1;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+UPDATE 1
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1100000.00
+(1 row)
+
+##langkah A (ulang)
+pagila=*# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;   -- 1100000 (BERUBAH)
+COMMIT;
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1100000.00
+(1 row)
+
+COMMIT
+
+###Q7
+##langkah A
+pagila=# BEGIN ISOLATION LEVEL REPEATABLE READ;
+SHOW transaction_isolation;  
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;  
+BEGIN
+ transaction_isolation 
+-----------------------
+ repeatable read
+(1 row)
+
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+##langkah B
+pagila=*# UPDATE lab9.rekening SET saldo = saldo + 100000 WHERE rekening_id = 1;
+UPDATE 1
+
+##langkah A (ulang)
+pagila=*# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+COMMIT;
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1100000.00
+(1 row)
+
+COMMIT
+
+##langkah A (ulang)
+pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1100000.00
+(1 row)
+
+###Q8-A
+##langkah A
+pagila=# DROP TABLE IF EXISTS lab9.eksperimen_phantom;
+CREATE TABLE lab9.eksperimen_phantom (
+    id    SERIAL PRIMARY KEY,
+    nama  TEXT NOT NULL,
+    saldo NUMERIC(12,2) NOT NULL
+);
+INSERT INTO lab9.eksperimen_phantom (nama, saldo) VALUES
+('Cici',  500000),
+('Dedi', 1500000),
+('Eka',  2000000);
+SELECT * FROM lab9.eksperimen_phantom ORDER BY id;
+NOTICE:  table "eksperimen_phantom" does not exist, skipping
+DROP TABLE
+CREATE TABLE
+INSERT 0 3
+ id | nama |   saldo    
+----+------+------------
+  1 | Cici |  500000.00
+  2 | Dedi | 1500000.00
+  3 | Eka  | 2000000.00
+(3 rows)
+
+##langkah B
+pagila=# BEGIN;
+SELECT COUNT(*) FROM lab9.eksperimen_phantom WHERE saldo > 1000000;
+BEGIN
+ count 
+-------
+     2
+(1 row)
+
+#langkah A
+pagila=*# INSERT INTO lab9.eksperimen_phantom (nama, saldo) VALUES ('Fani', 3000000);
+INSERT 0 1
+pagila=*# SELECT COUNT(*) FROM lab9.eksperimen_phantom WHERE saldo > 1000000;
+COMMIT;
+ count 
+-------
+     3
+(1 row)
+
+COMMIT
+
+###Q8-B
+##langkah A
+pagila=# BEGIN ISOLATION LEVEL REPEATABLE READ;
+SELECT COUNT(*) FROM lab9.eksperimen_phantom WHERE saldo > 1000000;
+BEGIN
+ count 
+-------
+     2
+(1 row)
+
+##langkah B
+pagila=*# INSERT INTO lab9.eksperimen_phantom (nama, saldo) VALUES ('Gani', 3500000);
+INSERT 0 1
+
+##langkah A
+pagila=*# SELECT COUNT(*) FROM lab9.eksperimen_phantom WHERE saldo > 1000000;
+COMMIT;
+ count 
+-------
+     3
+(1 row)
+
+COMMIT
+
+##langkah A
+pagila=# SELECT COUNT(*) FROM lab9.eksperimen_phantom WHERE saldo > 1000000; 
+ count 
+-------
+     3
+(1 row)
+
+###Q9
+##langkah A
+pagila=# BEGIN;
+UPDATE lab9.rekening SET saldo = saldo - 300000 WHERE rekening_id = 1;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+UPDATE 1
+ rekening_id |   saldo   
+-------------+-----------
+           1 | 700000.00
+(1 row)
+
+##langakh B
+pagila=*# BEGIN;
+SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; 
+SHOW transaction_isolation;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+COMMIT;
+WARNING:  there is already a transaction in progress
+BEGIN
+ERROR:  SET TRANSACTION ISOLATION LEVEL must be called before any query
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ERROR:  current transaction is aborted, commands ignored until end of transaction block
+ROLLBACK
+
+##langkah A
+pagila=# ROLLBACK;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+WARNING:  there is no transaction in progress
+ROLLBACK
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+###Q10
+##langkah A
+pagila=# BEGIN;
+SELECT saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+   saldo    
+------------
+ 1000000.00
+(1 row)
+
+##langkah B
+pagila=*# BEGIN;
+SELECT saldo FROM lab9.rekening WHERE rekening_id = 1;
+WARNING:  there is already a transaction in progress
+BEGIN
+   saldo    
+------------
+ 1000000.00
+(1 row)
+
+##langkah A
+pagila=*# UPDATE lab9.rekening SET saldo = 1100000 WHERE rekening_id = 1;
+COMMIT;
+UPDATE 1
+COMMIT
+
+##langkah B
+pagila=# UPDATE lab9.rekening SET saldo = 1200000 WHERE rekening_id = 1;
+COMMIT;
+UPDATE 1
+WARNING:  there is no transaction in progress
+COMMIT
+
+##hasil
+pagila=# SELECT saldo FROM lab9.rekening WHERE rekening_id = 1;
+   saldo    
+------------
+ 1200000.00
+(1 row)
+
+##pencegahan
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id = 1;
+UPDATE lab9.rekening SET saldo = saldo + 100000 WHERE rekening_id = 1;
+UPDATE lab9.rekening SET saldo = saldo + 200000 WHERE rekening_id = 1;
+SELECT saldo FROM lab9.rekening WHERE rekening_id = 1;
+UPDATE 1
+UPDATE 1
+UPDATE 1
+   saldo    
+------------
+ 1300000.00
+(1 row)

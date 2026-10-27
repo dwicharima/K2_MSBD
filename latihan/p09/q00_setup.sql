@@ -1,3 +1,5 @@
+CREATE SCHEMA lab9;
+
 CREATE TABLE lab9.rekening (
     rekening_id INT PRIMARY KEY,
     pemilik TEXT NOT NULL,
