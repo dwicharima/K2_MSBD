@@ -1,12 +1,12 @@
 # Laporan Latihan Kelompok Pertemuan 9
 
-| Nama                   | NIM       | Kontribusi                    |
-| ---------------------- | --------- | ----------------------------- |
-| Agnes Natalia Siregar  | 251402108 |  |
-| Abdullah Zufar Aulia   | 251402111 |  |
-| Rasyd Arija A. Ritonga | 251402020 |  |
-| Dwi Charima Husni      | 251402088 |  |
-| Fakhry Adrian Daulay   | 251402053 |  |
+| Nama                   | NIM       | Kontribusi |
+|------------------------|-----------|------------|
+| Agnes Natalia Siregar  | 251402108 | Langkah 1: Setup lingkungan pengujian, pengerjaan Q00 dan Q1–Q5 |
+| Rasyd Arija A. Ritonga  | 251402020 | Langkah 2: Pengerjaan pengujian Q6–Q11 |
+| Abdullah Zufar Aulia   | 251402111 | Langkah 3: Pengerjaan pengujian Q12–Q19 |
+| Fakhry Adrian Daulay   | 251402053 | Langkah 4: Pengerjaan pengujian Q20–Q23 |
+| Dwi Charima Husni      | 251402088 | Langkah 5–6: Pengerjaan pengujian Q24–Q29 |
 
 Versi PostgreSQL: 17.11  
 Alat: Docker, PowerShell, dan psql  
