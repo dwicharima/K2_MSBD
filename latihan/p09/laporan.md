@@ -8,10 +8,17 @@
 | Dwi Charima Husni      | 251402088 |  |
 | Fakhry Adrian Daulay   | 251402053 |  |
 
+Versi PostgreSQL: 17.11  
+Alat: Docker, PowerShell, dan psql  
+Container: msbd-pg  
+Database: latihan  
+Schema: lab9
+
 ## Jawaban Q1–Q32
 ### Q1
 Buktikan kondisi awal dan jumlah saldo keseluruhan.
 >> Data awal memuat saldo masing-masing sebesar Rp1.000.000 untuk Ani dan Budi sehingga total keseluruhan saldo di awal adalah Rp2.000.000.
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
 $ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
  rekening_id | pemilik |   saldo    
@@ -24,6 +31,9 @@ $ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.
 -------------
   2000000.00
 (1 row)
+```
+
+---
 
 ### Q2
 Jalankan BEGIN, ubah saldo, lalu periksa hasil sebelum COMMIT. Apa yang terlihat di sesi lain?
@@ -32,6 +42,7 @@ Di Sesi B: Saldo Ani masih tetap 1000000.00 dan Budi 1000000.00 (belum berubah).
 Status: Transaksi aktif di Sesi A (belum COMMIT / ROLLBACK).
 Terjadi karena penerapan aturan Isolation (khususnya tingkat Read Committed default PostgreSQL). Perubahan data yang dilakukan dalam satu transaksi aktif (BEGIN) di Sesi A tidak akan terlihat oleh sesi lain (Sesi B) sebelum transaksi tersebut di-commit secara permanen. Hal ini mencegah dirty read.
 
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
 $ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
 BEGIN
@@ -47,6 +58,9 @@ UPDATE 1
            1 | Ani     |  800000.00
            2 | Budi    | 1000000.00
 (2 rows)
+```
+
+---
 
 ### Q3
 Bandingkan COMMIT dan ROLLBACK. Perubahan mana yang bertahan?
@@ -55,6 +69,7 @@ Setelah ROLLBACK, saldo Budi kembali seperti semula sebelum blok BEGIN dijalanka
 Status: COMMIT (Permanen), ROLLBACK (Dibatalkan).
 Perintah COMMIT mengakhiri transaksi dan menyimpan semua perubahan secara permanen ke dalam basis data. Sebaliknya, perintah ROLLBACK membatalkan seluruh perubahan yang dilakukan selama transaksi berlangsung dan mengembalikan kondisi data ke keadaan semula sebelum transaksi dimulai.
 
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
 $ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
 BEGIN
@@ -75,7 +90,9 @@ ROLLBACK
            1 | Ani     |  800000.00
            2 | Budi    | 1100000.00
 (2 rows)
+```
 
+---
 
 ### Q4
 Buat transaksi dengan SAVEPOINT, ubah saldo, lalu jalankan ROLLBACK TO SAVEPOINT. Bagian mana yang dibatalkan?
@@ -83,6 +100,7 @@ Buat transaksi dengan SAVEPOINT, ubah saldo, lalu jalankan ROLLBACK TO SAVEPOINT
 Status: Berhasil di-rollback sebagian ke sp_satu.
 Perintah ROLLBACK TO SAVEPOINT hanya membatalkan pernyataan SQL yang dieksekusi setelah titik penanda (SAVEPOINT) tersebut dibuat. Perubahan yang terjadi sebelum SAVEPOINT tetap aman dan dipertahankan di dalam transaksi.
 
+```
 AGNES@LAPTOP-1T3ANVB7 MINGW64 /c/Semester 3/msbd-2026 (latihan/p09-transaksi-konkurensi)
 $ docker exec -i msbd-pg psql -U msbd -d pagila < latihan/p09/q01_q32_transaksi.sql
 BEGIN
@@ -97,13 +115,16 @@ ROLLBACK
 (2 rows)
 
 COMMIT
+```
+
+---
 
 ### Q5
 Jelaskan bagaimana atomicity dan consistency didukung oleh transaksi dan constraint CHECK.
 >> Atomicity (Atomisitas): Didukung penuh oleh mekanisme transaksi (BEGIN, COMMIT, ROLLBACK). Prinsip ini memastikan bahwa seluruh rangkaian perintah di dalam blok transaksi diperlakukan sebagai satu kesatuan utuh (all-or-nothing). Jika ada satu saja perintah yang gagal di tengah jalan, seluruh perubahan akan dibatalkan (rollback) sehingga tidak ada data setengah jadi yang tersimpan.
 Consistency (Konsistensi): Didukung oleh kombinasi transaksi dan aturan constraint (seperti PRIMARY KEY dan CHECK (saldo >= 0) yang kita buat di awal). Constraint berfungsi sebagai penjaga aturan integritas data agar database selalu berada dalam kondisi valid. Jika ada transaksi yang mencoba melanggar aturan (misalnya memaksa saldo menjadi negatif), transaksi tersebut akan ditolak oleh sistem dan dibatalkan, sehingga konsistensi data tetap terjaga.
 
-### Q6
+### Q6 — Non-repeatable read
 Pada READ COMMITTED, Sesi A menjalankan BEGIN lalu SELECT saldo rekening 1. Sesi B mengubah saldo rekening 1 dan COMMIT. Sesi A menjalankan SELECT yang sama lagi. Apakah hasil kedua pembacaan berubah?
 >> Ya, berubah. Pembacaan pertama di Sesi A = 1000000.00, pembacaan kedua (setelah Sesi B COMMIT) = 1100000.00.
 Status: terjadi non-repeatable read.
@@ -139,7 +160,7 @@ pagila=*# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
 pagila=*# COMMIT;
 ```
 
-### Q7
+### Q7 — Perbandingan isolation
 Ulangi Q6 dengan REPEATABLE READ. Jelaskan perbedaan hasilnya dengan READ COMMITTED.
 >> Pada REPEATABLE READ, pembacaan kedua di Sesi A tetap 1000000.00 walaupun Sesi B sudah mengubah menjadi 1100000.00 dan COMMIT. Nilai baru baru terlihat setelah Sesi A selesai (COMMIT), yaitu 1100000.00.
 Status: tidak terjadi non-repeatable read.
@@ -183,7 +204,7 @@ pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
            1 | 1100000.00
 ```
 
-### Q8
+### Q8 — Phantom read
 Buat tabel eksperimen berisi beberapa baris. Sesi A menghitung baris dengan saldo di atas nilai tertentu. Sesi B memasukkan baris yang memenuhi kondisi dan COMMIT. Ulangi SELECT di Sesi A pada READ COMMITTED dan REPEATABLE READ; bandingkan jumlahnya.
 >> Tabel `lab9.eksperimen_phantom` berisi Cici (500000), Dedi (1500000), Eka (2000000). Kondisi: saldo > 1000000, jumlah awal = 2.
 READ COMMITTED: jumlah berubah dari 2 menjadi 3 setelah Sesi B menyisipkan 'Fani' (3000000) dan COMMIT.
@@ -249,7 +270,7 @@ pagila=# SELECT COUNT(*) FROM lab9.eksperimen_phantom WHERE saldo > 1000000;
      3
 ```
 
-### Q9
+### Q9 — Dirty read
 Di Sesi A ubah saldo tanpa COMMIT. Di Sesi B coba SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED dan baca saldo tersebut. Apakah PostgreSQL menampilkan perubahan yang belum di-commit? Jelaskan perilaku READ UNCOMMITTED di PostgreSQL.
 >> Tidak. Sesi A mengubah saldo Ani menjadi 700000.00 (belum COMMIT), tetapi Sesi B (READ UNCOMMITTED) tetap membaca 1000000.00. Setelah Sesi A ROLLBACK, saldo tetap 1000000.00.
 Status: dirty read tidak terjadi.
@@ -288,7 +309,7 @@ pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
            1 | 1000000.00
 ```
 
-### Q10
+### Q10 — Lost update
 Kedua sesi membaca saldo yang sama. Masing-masing menghitung saldo baru di sisi aplikasi dan menulis nilai tetap berdasarkan nilai yang dibaca. Tunjukkan bagaimana pembaruan satu sesi dapat menimpa hasil sesi lain.
 >> Kedua sesi membaca saldo 1000000.00. Sesi A ingin menambah 100000 (menulis 1100000) dan COMMIT. Sesi B ingin menambah 200000 (menulis 1200000) dan COMMIT. Saldo akhir = 1200000.00, padahal seharusnya 1300000.00.
 Status: terjadi lost update, tambahan 100000 dari Sesi A hilang.
@@ -338,7 +359,7 @@ pagila=# SELECT saldo FROM lab9.rekening WHERE rekening_id = 1;
 
 ### Q11
 Buat tabel ringkas: anomali, urutan kejadian, isolation level, hasil yang diamati, dan cara mencegah atau menangani masalah.
-di file Q11_table_ringkasan.md
+>> [Q11_table_ringkasan.md](Q11_table_ringkasan.md)
 
 ### Q12
 Perbaiki lost update menggunakan pembaruan atomik. Jelaskan mengapa menghitung berdasarkan nilai kolom di database lebih aman daripada menulis nilai hasil hitung lama.
@@ -493,9 +514,7 @@ pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
 
 ### Q14
 Buat kolom versi (version_no) atau gunakan nilai saldo yang dibaca sebagai kondisi UPDATE. Tunjukkan bagaimana aplikasi mengetahui bahwa data sudah berubah.
->> Dibuat tabel bantu lab9.rekening_versi (salinan rekening + kolom version_no) agar struktur lab9.rekening tidak berubah. Sesi A dan B sama-sama membaca (saldo 1000000.00, version_no 1). Sesi A UPDATE ... WHERE version_no = 1 -> UPDATE 1 lalu COMMIT (versi menjadi 2). Sesi B UPDATE ... WHERE version_no = 1 -> UPDATE 0: tidak ada baris yang cocok, sehingga aplikasi tahu data sudah diubah pihak lain dan tidak menimpa apa pun. Sesi B ROLLBACK, membaca ulang (1100000.00, versi 2), menghitung ulang, dan UPDATE ... WHERE version_no = 2 -> UPDATE 1. Saldo akhir 1300000.00 (versi 3); kedua penambahan tercatat. Pada varian memakai nilai saldo sebagai kondisi (WHERE saldo = 1000000), Sesi B juga mendapat UPDATE 0 dan saldo tetap 1100000.00. Pada uji ABA, saldo dinaikkan lalu dikembalikan ke 1000000.00 (version_no sudah 3): kondisi version_no = 1 menghasilkan UPDATE 0 (terdeteksi), sedangkan kondisi saldo = 1000000 menghasilkan UPDATE 1 (tidak terdeteksi).
-Status: konflik terdeteksi lewat jumlah baris terpengaruh (UPDATE 0); tidak ada lost update.
-Ini optimistic locking: tidak mengunci saat membaca, hanya memverifikasi saat menulis bahwa data belum berubah, dan bila gagal transaksi diulang dari awal (baca ulang, hitung ulang, tulis lagi). Cocok untuk konflik yang jarang dan waktu "berpikir" pengguna yang lama, karena tidak ada lock yang ditahan. Kelemahan kondisi nilai saldo: nilai bisa kebetulan kembali sama (masalah ABA) sehingga perubahan tidak terdeteksi. version_no selalu bertambah, jadi lebih andal.
+>> Dibuat tabel bantu lab9.rekening_versi (salinan rekening + kolom version_no) agar struktur lab9.rekening tidak berubah. Sesi A dan B sama-sama membaca (saldo 1000000.00, version_no 1). Sesi A UPDATE ... WHERE version_no = 1 -> UPDATE 1 lalu COMMIT (versi menjadi 2). Sesi B UPDATE ... WHERE version_no = 1 -> UPDATE 0: tidak ada baris yang cocok, sehingga aplikasi tahu data sudah diubah pihak lain dan tidak menimpa apa pun. Sesi B ROLLBACK, membaca ulang (1100000.00, versi 2), menghitung ulang, dan UPDATE ... WHERE version_no = 2 -> UPDATE 1. Saldo akhir 1300000.00 (versi 3); kedua penambahan tercatat. Pada varian memakai nilai saldo sebagai kondisi (WHERE saldo = 1000000), Sesi B juga mendapat UPDATE 0 dan saldo tetap 1100000.00. Pada uji ABA, saldo dinaikkan lalu dikembalikan ke 1000000.00 (version_no sudah 3): kondisi version_no = 1 menghasilkan UPDATE 0 (terdeteksi), sedangkan kondisi saldo = 1000000 menghasilkan UPDATE 1 (tidak terdeteksi). Status: konflik terdeteksi lewat jumlah baris terpengaruh (UPDATE 0); tidak ada lost update. Ini optimistic locking: tidak mengunci saat membaca, hanya memverifikasi saat menulis bahwa data belum berubah, dan bila gagal transaksi diulang dari awal (baca ulang, hitung ulang, tulis lagi). Cocok untuk konflik yang jarang dan waktu "berpikir" pengguna yang lama, karena tidak ada lock yang ditahan. Kelemahan kondisi nilai saldo: nilai bisa kebetulan kembali sama (masalah ABA) sehingga perubahan tidak terdeteksi. version_no selalu bertambah, jadi lebih andal.
 
 **Persiapan: tabel bantu**
 ```
@@ -841,7 +860,8 @@ DROP TABLE
 ### Q18
 Bandingkan FOR UPDATE, FOR NO KEY UPDATE, FOR SHARE, dan FOR KEY SHARE. Jelaskan tujuan umum dan kapan transaksi lain mungkin terhalang.
 >> Keempat jenis lock memiliki tingkat perlindungan dan kompatibilitas berbeda. Transaksi lain dapat menunggu apabila lock yang dimintanya bertentangan dengan lock yang sudah dipegang transaksi pertama. FOR UPDATE mengunci baris secara kuat untuk melindungi pembaruan, termasuk perubahan kolom yang menjadi key. FOR NO KEY UPDATE digunakan ketika baris akan diperbarui, tetapi perubahan tersebut tidak mengubah key yang relevan bagi foreign key. FOR SHARE mengizinkan transaksi lain membaca dan mengambil lock bersama, tetapi dapat menghalangi transaksi yang ingin mengubah baris. FOR KEY SHARE lock yang lebih ringan, terutama untuk melindungi key baris agar tidak dihapus atau diubah dengan cara yang bertentangan.
-```
+
+---
 
 ### Q19
 Di Sesi A, mulai transaksi dan kunci rekening 1 dengan SELECT ... FOR UPDATE. Di Sesi B, coba mengunci baris yang sama. Catat perilaku menunggu dan apa yang terjadi setelah Sesi A COMMIT.
@@ -861,7 +881,8 @@ CONTEXT:  while locking tuple (0,1) in relation "rekening"
 ### Q21
 Ulangi dengan urutan penguncian konsisten: semua sesi mengunci rekening_id dari nilai terkecil ke terbesar. Apakah deadlock dapat dihindari pada skenario ini?
 >> Pada skenario ini, urutan lock yang konsisten dapat menghindari deadlock karena kedua transaksi tidak saling memegang lock dalam urutan yang berlawanan.
-```
+
+---
 
 ### Q22
 Jelaskan perbedaan deadlock dan antrean lock panjang. Gunakan contoh transaksi yang menahan lock terlalu lama.
@@ -892,7 +913,8 @@ Sesi B menunggu sampai Sesi A menyelesaikan transaksi. Jika Sesi A terlalu lama 
 Akhiri transaksi Sesi A dengan COMMIT;, kemudian selesaikan Sesi B dengan COMMIT; juga.
 
 Deadlock membutuhkan siklus saling menunggu, sedangkan antrean lock panjang cukup terjadi karena satu transaksi menahan lock terlalu lama.
-```
+
+---
 
 ### Q23
 Bandingkan lock_timeout, statement_timeout, idle_in_transaction_session_timeout, dan deadlock_timeout. Jelaskan fungsi masing-masing.
@@ -902,3 +924,493 @@ idle_in_transaction_session_timeout : Mengakhiri sesi yang terlalu lama tidak ak
 deadlock_timeout : Menentukan berapa lama PostgreSQL menunggu sebelum melakukan pemeriksaan deadlock pada situasi lock yang menunggu.
 
 Keempat parameter memiliki fungsi berbeda. lock_timeout membatasi waktu tunggu lock, statement_timeout membatasi waktu eksekusi query, idle_in_transaction_session_timeout mengatasi transaksi yang dibiarkan diam, sedangkan deadlock_timeout mengatur kapan PostgreSQL mulai memeriksa deadlock.
+
+---
+
+### Q24 — SKIP LOCKED
+Buat tabel antrean pekerjaan dengan id dan status. Kunci satu baris pada Sesi A. Pada Sesi B, jalankan SELECT ... FOR UPDATE SKIP LOCKED. Baris mana yang dikembalikan? Jelaskan kegunaannya untuk worker antrean.
+>> Perintah FOR UPDATE SKIP LOCKED digunakan untuk mengambil baris yang tidak sedang dikunci oleh transaksi lain tanpa harus menunggu. Pada pengujian ini, Sesi A mengunci pekerjaan dengan id = 1, sehingga Sesi B melewati baris tersebut dan mendapatkan pekerjaan dengan id = 2 dan id = 3.
+
+Fitur ini berguna pada sistem antrean pekerjaan yang memiliki beberapa worker, agar setiap worker dapat mengambil pekerjaan yang tersedia tanpa menunggu pekerjaan yang sedang diproses oleh worker lain.
+
+#### Hasil Percobaan
+
+**1. Persiapan tabel antrean pekerjaan**
+
+Tabel lab9.antrean_pekerjaan berisi tiga pekerjaan dengan status menunggu.
+
+```
+CREATE TABLE IF NOT EXISTS lab9.antrean_pekerjaan (
+    id INT PRIMARY KEY,
+    status TEXT NOT NULL
+);
+
+INSERT INTO lab9.antrean_pekerjaan (id, status)
+VALUES
+    (1, 'menunggu'),
+    (2, 'menunggu'),
+    (3, 'menunggu')
+ON CONFLICT (id) DO NOTHING;
+
+SELECT * FROM lab9.antrean_pekerjaan
+ORDER BY id;
+```
+
+Hasil:
+
+```
+ id |  status
+----+----------
+  1 | menunggu
+  2 | menunggu
+  3 | menunggu
+(3 rows)
+```
+
+**2. Sesi A — Mengunci pekerjaan dengan id = 1**
+
+```
+BEGIN;
+
+SELECT *
+FROM lab9.antrean_pekerjaan
+WHERE id = 1
+FOR UPDATE;
+```
+
+Hasil:
+
+```
+BEGIN
+ id |  status
+----+----------
+  1 | menunggu
+(1 row)
+```
+
+Transaksi Sesi A dibiarkan terbuka agar baris dengan id = 1 tetap terkunci saat Sesi B menjalankan query.
+
+**3. Sesi B — Mengambil pekerjaan yang tidak terkunci**
+
+```
+BEGIN;
+
+SELECT *
+FROM lab9.antrean_pekerjaan
+WHERE status = 'menunggu'
+ORDER BY id
+FOR UPDATE SKIP LOCKED;
+```
+
+Hasil:
+
+```
+BEGIN
+ id |  status
+----+----------
+  2 | menunggu
+  3 | menunggu
+(2 rows)
+```
+
+Sesi B mendapatkan pekerjaan dengan id = 2 dan id = 3, sedangkan pekerjaan dengan id = 1 dilewati karena sedang dikunci Sesi A.
+
+**4. Mengakhiri transaksi**
+
+Setelah hasil pengujian diperoleh, transaksi diakhiri dengan menjalankan COMMIT pada kedua sesi. Kedua transaksi berhasil diselesaikan.
+
+### Penjelasan dan Kesimpulan
+
+Berdasarkan hasil percobaan, FOR UPDATE SKIP LOCKED berhasil melewati baris dengan id = 1 yang sedang dikunci Sesi A dan mengembalikan dua baris lainnya, yaitu id = 2 dan id = 3. Hal ini menunjukkan bahwa PostgreSQL dapat mengambil baris yang tersedia tanpa menunggu kunci pada baris lain dilepaskan.
+
+Fitur ini bermanfaat untuk sistem antrean pekerjaan dengan banyak worker, karena setiap worker dapat mengambil pekerjaan yang belum dikunci oleh transaksi lain sehingga pemrosesan antrean dapat berjalan lebih efisien.
+
+---
+
+### Q25 — NOWAIT
+Ulangi penguncian baris yang sama menggunakan FOR UPDATE NOWAIT. Catat bahwa perintah gagal segera jika baris tidak dapat dikunci, alih-alih menunggu.
+>> FOR UPDATE NOWAIT digunakan untuk mengunci baris tanpa menunggu apabila baris tersebut sedang dikunci oleh transaksi lain. Jika baris tidak dapat dikunci, PostgreSQL langsung menghasilkan error. Dengan demikian, aplikasi dapat mengetahui bahwa baris sedang tidak tersedia tanpa harus menunggu kunci dilepaskan.
+
+#### Hasil Percobaan
+
+**1. Sesi A — Mengunci pekerjaan dengan id = 1**
+```
+BEGIN;
+
+SELECT *
+FROM lab9.antrean_pekerjaan
+WHERE id = 1
+FOR UPDATE;
+```
+
+Hasil:
+
+```
+BEGIN
+ id |  status
+----+----------
+  1 | menunggu
+(1 row)
+```
+
+Sesi A berhasil memperoleh kunci pada baris dengan id = 1. Transaksi Sesi A harus tetap terbuka ketika Sesi B menjalankan query agar konflik penguncian dapat diuji.
+
+**2. Sesi B — Mencoba mengunci baris menggunakan NOWAIT**
+
+```
+BEGIN;
+
+SELECT *
+FROM lab9.antrean_pekerjaan
+WHERE id = 1
+FOR UPDATE NOWAIT;
+```
+
+Hasil:
+
+```
+BEGIN
+ERROR:  could not obtain lock on row in relation "antrean_pekerjaan"
+```
+
+Perintah gagal karena baris dengan id = 1 sedang dikunci oleh transaksi lain. PostgreSQL langsung menghasilkan error tanpa menunggu kunci dilepaskan.
+
+**3. Mengakhiri transaksi Sesi B**
+
+Setelah terjadi error, Sesi B menjalankan ROLLBACK; dan akan menghasilkan tulisan ROLLBACK.
+Perintah ROLLBACK membatalkan transaksi Sesi B yang gagal akibat error.
+
+**4. Mengakhiri transaksi Sesi A**
+
+Setelah pengujian selesai, Sesi A menjalankan COMMIT; dan menghasilkan tulisan COMMIT.
+Transaksi Sesi A berhasil diselesaikan dan kunci baris dilepaskan.
+
+**Penjelasan:**
+Berdasarkan hasil percobaan, FOR UPDATE NOWAIT langsung menghasilkan error could not obtain lock on row in relation "antrean_pekerjaan" ketika baris dengan id = 1 sedang dikunci oleh Sesi A. Hal ini menunjukkan bahwa PostgreSQL tidak menunggu kunci dilepaskan, berbeda dengan FOR UPDATE biasa yang dapat menunggu jika terjadi konflik penguncian. Pengujian membuktikan bahwa NOWAIT dapat digunakan ketika aplikasi ingin segera mengetahui bahwa suatu baris tidak dapat dikunci. Setelah error, transaksi Sesi B dibatalkan menggunakan ROLLBACK, sedangkan Sesi A menyelesaikan transaksinya dengan COMMIT.
+
+---
+
+### Q26 — Write Skew
+Buat tabel dokter_jaga dengan dua dokter aktif dan aturan bisnis minimal satu dokter harus tetap aktif. Jalankan dua transaksi dengan isolation level REPEATABLE READ. Masing-masing transaksi membaca jumlah dokter aktif, lalu menonaktifkan dokter yang berbeda. Amati apakah kedua transaksi dapat melakukan COMMIT dan apakah aturan bisnis dilanggar.
+>> Pada isolation level REPEATABLE READ, kedua transaksi dapat berhasil melakukan COMMIT karena masing-masing mengubah baris dokter yang berbeda. Akibatnya, kedua dokter menjadi tidak aktif sehingga aturan bisnis minimal satu dokter harus tetap aktif dilanggar.
+
+#### Hasil Pengujian
+
+**1. Kondisi awal**
+```
+Tabel lab9.dokter_jaga diisi dengan dua dokter:
+
+dokter_id | nama | aktif 
+-----------+------+-------
+         1 | Ani  | t
+         2 | Budi | t
+(2 rows)
+```
+
+**2. Sesi A**
+
+Menjalankan transaksi dengan isolation level REPEATABLE READ dan memeriksa jumlah dokter aktif.
+
+```BEGIN ISOLATION LEVEL REPEATABLE READ;
+
+SELECT COUNT(*) AS dokter_aktif
+FROM lab9.dokter_jaga
+WHERE aktif = TRUE;
+```
+
+Hasil: dokter_aktif = 2.
+
+Selanjutnya, Sesi A menonaktifkan Ani dan melakukan COMMIT.
+
+```UPDATE lab9.dokter_jaga
+SET aktif = FALSE
+WHERE dokter_id = 1;
+
+COMMIT;
+```
+
+Hasil: UPDATE 1 dan COMMIT berhasil.
+
+**3. Sesi B**
+
+Sebelum Sesi A melakukan perubahan, Sesi B juga telah memulai transaksi REPEATABLE READ dan membaca jumlah dokter aktif.
+
+```BEGIN ISOLATION LEVEL REPEATABLE READ;
+
+SELECT COUNT(*) AS dokter_aktif
+FROM lab9.dokter_jaga
+WHERE aktif = TRUE;
+```
+
+Hasil: dokter_aktif = 2.
+
+Setelah Sesi A berhasil melakukan COMMIT, Sesi B menonaktifkan Budi dan melakukan COMMIT.
+
+```UPDATE lab9.dokter_jaga
+SET aktif = FALSE
+WHERE dokter_id = 2;
+
+COMMIT;
+```
+
+Hasil: UPDATE 1 dan COMMIT berhasil.
+
+**4. Pemeriksaan hasil akhir**
+
+```SELECT * FROM lab9.dokter_jaga
+ORDER BY dokter_id;
+```
+
+Hasil pengujian:
+```
+dokter_id | nama | aktif 
+-----------+------+-------
+         1 | Ani  | f
+         2 | Budi | f
+(2 rows)
+```
+
+**Penjelasan:**
+Kedua transaksi membaca jumlah dokter aktif sebanyak dua orang sebelum perubahan dilakukan. Sesi A menonaktifkan Ani, sedangkan Sesi B menonaktifkan Budi. Karena keduanya mengubah baris yang berbeda, kedua transaksi berhasil melakukan COMMIT. Fenomena ini disebut write skew, yaitu kondisi ketika dua transaksi yang berjalan bersamaan menghasilkan keadaan yang melanggar aturan bisnis meskipun masing-masing transaksi berhasil.
+
+Pengujian membuktikan bahwa pada isolation level REPEATABLE READ, kedua transaksi dapat berhasil melakukan COMMIT, tetapi aturan bisnis minimal satu dokter harus tetap aktif dilanggar karena seluruh dokter menjadi tidak aktif.
+
+---
+
+### Q27 — SERIALIZABLE Mencegah Write Skew
+Ulangi pengujian Q26 dengan isolation level SERIALIZABLE. Amati apakah kedua transaksi dapat melakukan COMMIT dan apakah aturan bisnis minimal satu dokter harus tetap aktif dapat dipertahankan.
+>> Isolation level SERIALIZABLE mencegah write skew dengan mendeteksi konflik antartransaksi. Salah satu transaksi dapat dibatalkan jika hasilnya tidak dapat diserialisasikan, sehingga aturan bisnis tetap terpenuhi.
+
+**Hasil Pengujian:**
+
+**1. Kondisi awal**
+
+Tabel lab9.dokter_jaga berisi dua dokter aktif:
+```
+ dokter_id | nama | aktif 
+-----------+------+-------
+         1 | Ani  | t
+         2 | Budi | t
+(2 rows)
+```
+
+**2. Sesi A**
+
+Sesi A memulai transaksi dengan isolation level SERIALIZABLE dan membaca jumlah dokter aktif.
+
+```BEGIN ISOLATION LEVEL SERIALIZABLE;
+
+SELECT COUNT(*) AS dokter_aktif
+FROM lab9.dokter_jaga
+WHERE aktif = TRUE;
+```
+
+Hasil: dokter_aktif = 2.
+
+Sesi A kemudian menonaktifkan Ani dan melakukan COMMIT.
+
+```UPDATE lab9.dokter_jaga
+SET aktif = FALSE
+WHERE dokter_id = 1;
+
+COMMIT;
+```
+
+Hasil: UPDATE 1 dan COMMIT berhasil.
+
+**3. Sesi B**
+
+Sesi B juga memulai transaksi dengan isolation level SERIALIZABLE dan membaca jumlah dokter aktif sebelum Sesi A melakukan COMMIT.
+```
+BEGIN ISOLATION LEVEL SERIALIZABLE;
+
+SELECT COUNT(*) AS dokter_aktif
+FROM lab9.dokter_jaga
+WHERE aktif = TRUE;
+```
+
+Hasil: dokter_aktif = 2.
+
+Sesi B kemudian menonaktifkan Budi.
+
+```UPDATE lab9.dokter_jaga
+SET aktif = FALSE
+WHERE dokter_id = 2;
+
+COMMIT;
+```
+
+Hasil: Perintah UPDATE berhasil, tetapi COMMIT gagal dengan pesan:
+
+```ERROR: could not serialize access due to read/write dependencies among transactions
+```
+
+PostgreSQL membatalkan transaksi Sesi B karena konflik serialisasi.
+
+**4. Pemeriksaan hasil akhir**
+```
+SELECT * FROM lab9.dokter_jaga
+ORDER BY dokter_id;
+```
+
+**Hasil pengujian:**
+```
+dokter_id | nama | aktif 
+-----------+------+-------
+         1 | Ani  | f
+         2 | Budi | t
+(2 rows)
+```
+
+**Penjelasan:**
+
+Berbeda dengan REPEATABLE READ pada Q26, isolation level SERIALIZABLE mendeteksi ketergantungan baca-tulis yang menimbulkan konflik. Oleh karena itu, Sesi A berhasil melakukan COMMIT, sedangkan Sesi B gagal saat COMMIT dan harus mengulang transaksi jika ingin mencoba kembali.
+
+Pengujian menunjukkan bahwa SERIALIZABLE mencegah terjadinya write skew pada kasus ini. Hanya satu dokter yang berhasil dinonaktifkan, sehingga aturan bisnis minimal satu dokter harus tetap aktif tetap terpenuhi.
+
+---
+
+### Q28 — SIReadLock
+Apa fungsi SIReadLock pada isolation level SERIALIZABLE? Apakah lock tersebut memblokir transaksi lain seperti FOR UPDATE?
+>> SIReadLock digunakan PostgreSQL untuk mendeteksi ketergantungan baca-tulis antartransaksi yang dapat menyebabkan hasil transaksi tidak konsisten. Lock ini tidak memblokir transaksi lain secara langsung seperti FOR UPDATE.
+
+**Analisis:**
+1. Pada isolation level SERIALIZABLE, PostgreSQL menggunakan predicate lock yang ditampilkan sebagai SIReadLock untuk melacak data yang dibaca oleh suatu transaksi.
+2. Jika transaksi lain mengubah data yang berkaitan dengan data yang dibaca tersebut, PostgreSQL dapat mendeteksi adanya konflik serialisasi.
+3. Berbeda dengan FOR UPDATE, SIReadLock tidak membuat transaksi lain harus menunggu untuk mengakses atau mengubah baris yang sama.
+4. Jika ketergantungan antartransaksi menyebabkan hasil yang tidak dapat diserialisasikan, PostgreSQL dapat membatalkan salah satu transaksi dengan error serialisasi.
+Penjelasan:
+
+SIReadLock bukan lock yang bertujuan menghalangi akses transaksi lain, melainkan membantu PostgreSQL mendeteksi konflik baca-tulis. Sementara itu, FOR UPDATE digunakan untuk mengunci baris agar transaksi lain yang ingin memperoleh lock yang bertentangan harus menunggu atau gagal, bergantung pada perintah yang digunakan.
+
+Jadi, SIReadLock berfungsi mendeteksi konflik serialisasi pada isolation level SERIALIZABLE, bukan memblokir transaksi secara langsung. Mekanisme ini membantu PostgreSQL menjaga konsistensi transaksi dengan membatalkan transaksi yang berkonflik jika diperlukan.
+
+---
+
+**Q29 — Retry Transaksi yang Gagal**
+Tulis pseudocode retry yang mengulang seluruh transaksi setelah SQLSTATE 40001 atau 40P01, membatasi percobaan, dan menggunakan jeda yang bertambah dengan jitter. Jelaskan mengapa operasi eksternal seperti mengirim surel sebaiknya dilakukan setelah COMMIT berhasil.
+>> Retry adalah mekanisme untuk mengulangi transaksi yang gagal karena konflik serialisasi atau deadlock. Pengulangan harus dilakukan dari awal agar transaksi membaca data terbaru dan menghitung ulang perubahan yang akan dilakukan.
+
+**Pseudocode:**
+```
+maks_percobaan = 5
+
+UNTUK percobaan dari 1 sampai maks_percobaan:
+    COBA:
+        BEGIN
+
+        BACA data terbaru
+        HITUNG ulang perubahan
+        JALANKAN seluruh query transaksi
+
+        COMMIT
+        KELUAR dari perulangan
+
+    JIKA SQLSTATE = 40001 atau 40P01:
+        ROLLBACK jika transaksi masih aktif
+
+        JIKA percobaan = maks_percobaan:
+            TAMPILKAN pesan gagal
+            KELUAR dari perulangan
+
+        jeda_dasar = 100 ms * 2^(percobaan - 1)
+        jitter = angka acak antara 0 dan 100 ms
+
+        TUNGGU jeda_dasar + jitter
+
+    JIKA error lainnya:
+        TANGANI error dan hentikan retry
+```
+
+**Penjelasan:**
+1. Batas percobaan: Retry dibatasi maksimal lima kali agar aplikasi tidak terus mengulang transaksi tanpa batas.
+2. SQLSTATE 40001: Menandakan kegagalan serialisasi.
+3. SQLSTATE 40P01: Menandakan terjadinya deadlock.
+4. Jeda bertambah dengan jitter: Waktu tunggu meningkat pada setiap percobaan dan ditambah jeda acak agar beberapa transaksi tidak terus mencoba kembali pada waktu yang sama.
+5. Mengulang seluruh transaksi: Setelah gagal, transaksi harus dimulai kembali dari BEGIN, membaca data terbaru, dan menjalankan ulang seluruh operasi database, bukan hanya query terakhir yang gagal.
+
+Mengapa operasi eksternal dilakukan setelah COMMIT?
+>> Operasi eksternal, seperti mengirim surel atau mengirim notifikasi, sebaiknya dilakukan setelah COMMIT berhasil. Jika dilakukan sebelum COMMIT, transaksi bisa gagal setelah surel terkirim sehingga penerima mendapat notifikasi tentang perubahan yang sebenarnya tidak tersimpan di database.
+
+Menempatkan operasi eksternal setelah COMMIT membantu menghindari kondisi tersebut. Namun, jika pengiriman harus dijamin tetap terlaksana meskipun aplikasi mengalami gangguan, pola transactional outbox dapat digunakan.
+
+**Kesimpulannya** adalah Mekanisme retry perlu membatasi jumlah percobaan, mengulang seluruh transaksi untuk SQLSTATE 40001 atau 40P01, serta menggunakan jeda bertambah dengan jitter. Operasi eksternal sebaiknya dilakukan setelah transaksi berhasil di-commit agar tidak menimbulkan efek samping dari transaksi yang gagal.
+
+---
+
+### Q30 — Matriks Enam Anomali Transaksi
+Susun matriks enam anomali, yaitu dirty read, non-repeatable read, phantom read, lost update, write skew, dan pembacaan yang tidak konsisten. Untuk setiap anomali, tuliskan cara reproduksi, hasil, dan mitigasinya.
+>>
+**Jawab:**
+| Anomali | Cara reproduksi | Hasil | Mitigasi |
+|---|---|---|---|
+| **Dirty read** | Sesi A mengubah data tanpa COMMIT, lalu Sesi B membaca data tersebut. | Perubahan yang belum di-commit tidak terlihat. | Gunakan mekanisme isolasi transaksi PostgreSQL. |
+| **Non-repeatable read** | Sesi A membaca baris. Sesi B mengubah dan melakukan COMMIT. Sesi A membaca ulang. | Pembacaan kedua dapat menghasilkan nilai berbeda. | Gunakan REPEATABLE READ. |
+| **Phantom read** | Sesi A membaca data berdasarkan kondisi tertentu. Sesi B menambahkan baris yang memenuhi kondisi tersebut. | Jumlah baris yang terbaca dapat berubah. | Gunakan REPEATABLE READ atau SERIALIZABLE. |
+| **Lost update** | Dua sesi membaca nilai yang sama lalu menulis perubahan masing-masing. | Perubahan salah satu sesi dapat tertimpa. | Gunakan FOR UPDATE atau pembaruan atomik. |
+| **Write skew** | Dua transaksi membaca jumlah dokter aktif yang sama lalu menonaktifkan dokter berbeda. | Kedua transaksi bisa berhasil COMMIT, tetapi semua dokter menjadi tidak aktif. | Gunakan SERIALIZABLE atau penguncian yang sesuai. |
+| **Read skew** | Satu transaksi membaca dua data terkait saat transaksi lain mengubah data di antaranya. | Data yang terbaca dapat berasal dari keadaan database berbeda. | Gunakan REPEATABLE READ. |
+
+**Penjelasan:**
+
+Setiap anomali terjadi karena interaksi antara pembacaan, perubahan data, dan urutan transaksi. Tingkat isolasi yang lebih tinggi dapat mencegah lebih banyak anomali, tetapi dapat meningkatkan kemungkinan transaksi dibatalkan atau perlu diulang.
+
+Matriks di atas merangkum cara reproduksi dan mitigasi secara konseptual. Bukti pengujian yang benar-benar diperoleh dalam eksperimen ini terutama berasal dari Q24, Q26, dan Q27; anomali lainnya perlu diuji tersendiri jika laporan mensyaratkan bukti eksekusi untuk setiap baris.
+
+---
+
+### Q31 — Rekomendasi Isolation Level
+Rekomendasikan isolation level untuk pembacaan sederhana yang dapat menerima perubahan antarpernyataan, laporan yang membutuhkan snapshot konsisten, dan transaksi dengan aturan bisnis lintas beberapa baris. Jelaskan kompromi dan risiko serialization failure.
+>>
+**Jawab:**
+| Kebutuhan | Isolation level yang direkomendasikan | Alasan |
+| --- | --- | --- |
+| Pembacaan sederhana yang dapat menerima perubahan antarpernyataan | READ COMMITTED | Setiap pernyataan membaca data yang sudah di-commit pada snapshot pernyataan tersebut. |
+| Laporan yang membutuhkan snapshot konsisten | REPEATABLE READ | Pembacaan dalam satu transaksi menggunakan snapshot yang konsisten sehingga perubahan yang di-commit oleh transaksi lain tidak mengubah snapshot tersebut. |
+| Transaksi dengan aturan bisnis lintas beberapa baris | SERIALIZABLE | PostgreSQL mendeteksi konflik yang dapat menyebabkan anomali serialisasi dan dapat membatalkan transaksi yang berkonflik. |
+
+**Penjelasan:**
+1. READ COMMITTED cocok untuk operasi baca sehari-hari karena relatif fleksibel. Namun, hasil query yang sama dapat berubah jika transaksi lain melakukan perubahan dan COMMIT di antara kedua pembacaan.
+2. REPEATABLE READ cocok untuk laporan yang harus membaca snapshot konsisten. Akan tetapi, isolation level ini di PostgreSQL masih dapat mengalami write skew, seperti yang dibuktikan pada Q26.
+3. SERIALIZABLE cocok untuk aturan bisnis yang harus tetap benar meskipun beberapa transaksi berjalan bersamaan. Komprominya adalah PostgreSQL dapat menghasilkan serialization failure dengan SQLSTATE 40001, sehingga aplikasi harus siap mengulang seluruh transaksi dari awal.
+
+**Kesimpulan:**
+Isolation level perlu dipilih berdasarkan kebutuhan konsistensi. READ COMMITTED sesuai untuk pembacaan sederhana, REPEATABLE READ sesuai untuk laporan dengan snapshot konsisten, sedangkan SERIALIZABLE direkomendasikan untuk transaksi dengan aturan bisnis lintas beberapa baris yang tidak boleh dilanggar.
+
+---
+
+### Q32 — Tiga Pelajaran Utama dari Eksperimen
+Tuliskan tiga pelajaran utama dari eksperimen. Setiap kesimpulan harus didukung bukti hasil query, urutan kejadian, atau pesan error, bukan hanya definisi teori.
+>>
+**Jawab:**
+1. Penguncian baris membantu mengatur pembagian pekerjaan antarsesi.
+Pada Q24, Sesi A mengunci pekerjaan dengan id = 1 menggunakan FOR UPDATE. Ketika Sesi B menjalankan FOR UPDATE SKIP LOCKED selagi kunci tersebut masih dipegang, Sesi B memperoleh pekerjaan dengan id = 2 dan id = 3, tanpa mengambil pekerjaan yang terkunci.
+
+Hasil tersebut menunjukkan bahwa SKIP LOCKED berguna ketika beberapa worker mengambil pekerjaan dari antrean yang sama.
+
+2. REPEATABLE READ belum tentu menjaga aturan bisnis lintas beberapa baris.
+Pada Q26, Sesi A dan Sesi B sama-sama membaca jumlah dokter aktif sebanyak 2. Sesi A menonaktifkan Ani dan berhasil melakukan COMMIT. Setelah itu, Sesi B menonaktifkan Budi dan juga berhasil melakukan COMMIT.
+
+Pemeriksaan akhir menunjukkan:
+```
+ dokter_id | nama | aktif
+-----------+------+-------
+         1 | Ani  | f
+         2 | Budi | f
+(2 rows)
+```
+
+Hasil ini membuktikan bahwa kedua transaksi dapat berhasil di-commit, tetapi aturan bisnis minimal satu dokter harus tetap aktif dilanggar.
+
+3. SERIALIZABLE dapat mencegah write skew, tetapi aplikasi harus menangani kegagalan transaksi.
+Pada Q27, kedua sesi membaca jumlah dokter aktif sebanyak 2. Sesi A berhasil menonaktifkan Ani dan melakukan COMMIT, sedangkan Sesi B gagal saat COMMIT dengan pesan:
+
+```ERROR: could not serialize access due to read/write dependencies among transactions
+DETAIL: Reason code: Canceled on identification as a pivot, during commit attempt.
+HINT: The transaction might succeed if retried.
+```
+
+Pemeriksaan akhir menunjukkan Ani tidak aktif (f), sedangkan Budi tetap aktif (t). Hasil ini menunjukkan bahwa PostgreSQL membatalkan salah satu transaksi untuk mencegah keadaan yang melanggar aturan bisnis.
+
+**Kesimpulan:**
+Eksperimen menunjukkan bahwa penguncian dapat membantu mengatur akses terhadap baris, REPEATABLE READ tidak selalu mencegah write skew, dan SERIALIZABLE dapat mencegah anomali tersebut dengan membatalkan transaksi yang berkonflik. Karena itu, aplikasi perlu memilih isolation level sesuai kebutuhan dan menyediakan mekanisme retry untuk transaksi yang gagal akibat konflik serialisasi.

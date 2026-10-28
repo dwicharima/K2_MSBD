@@ -869,3 +869,145 @@ BEGIN
 
 pagila=*# COMMIT;
 COMMIT
+
+### Q24
+Alat: psql di Docker (msbd-pg), PostgreSQL 17.11.
+
+## Sesi A (output mentah terminal)
+latihan=# BEGIN;
+BEGIN
+latihan=*# SELECT * FROM lab9.antrean_pekerjaan WHERE id = 1 FOR UPDATE;
+ id | status
+----+---------
+  1 | menunggu
+(1 row)
+
+latihan=*# 
+
+## Sesi B (output mentah terminal)
+latihan=# BEGIN;
+BEGIN
+latihan=*# SELECT * FROM lab9.antrean_pekerjaan
+WHERE status = 'menunggu' ORDER BY id FOR UPDATE SKIP LOCKED;
+ id | status
+----+---------
+  2 | menunggu
+  3 | menunggu
+(2 rows)
+
+latihan=*# COMMIT;
+COMMIT
+
+## Sesi A
+latihan=*# COMMIT;
+COMMIT
+
+
+### Q25
+
+## Sesi A (output mentah terminal)
+latihan=# BEGIN;
+BEGIN
+latihan=*# SELECT * FROM lab9.antrean_pekerjaan WHERE id = 1 FOR UPDATE;
+ id | status
+----+---------
+  1 | menunggu
+(1 row)
+
+latihan=*# 
+
+## Sesi B (output mentah terminal)
+latihan=# BEGIN;
+BEGIN
+latihan=*# SELECT * FROM lab9.antrean_pekerjaan WHERE id = 1 FOR UPDATE NOWAIT;
+ERROR:  could not obtain lock on row in relation "antrean_pekerjaan"
+latihan=!# ROLLBACK;
+ROLLBACK
+
+## Sesi A
+latihan=*# COMMIT;
+COMMIT
+
+### Q26
+
+## Sesi A (output mentah terminal)
+latihan=# BEGIN ISOLATION LEVEL REPEATABLE READ;
+BEGIN
+latihan=*# SELECT COUNT(*) FROM lab9.dokter_jaga WHERE aktif = TRUE;
+ count
+-------
+     2
+(1 row)
+
+latihan=*# UPDATE lab9.dokter_jaga SET aktif = FALSE WHERE dokter_id = 1;
+UPDATE 1
+latihan=*# COMMIT;
+COMMIT
+
+## Sesi B (output mentah terminal)
+latihan=# BEGIN ISOLATION LEVEL REPEATABLE READ;
+BEGIN
+latihan=*# SELECT COUNT(*) FROM lab9.dokter_jaga WHERE aktif = TRUE;
+ count
+-------
+     2
+(1 row)
+
+latihan=*# UPDATE lab9.dokter_jaga SET aktif = FALSE WHERE dokter_id = 2;
+UPDATE 1
+latihan=*# COMMIT;
+COMMIT
+
+latihan=# SELECT * FROM lab9.dokter_jaga ORDER BY dokter_id;
+ dokter_id | nama | aktif
+-----------+------+-------
+         1 | Ani  | f
+         2 | Budi | f
+(2 rows)
+
+
+### Q27
+
+## Sesi A (output mentah terminal)
+latihan=# BEGIN ISOLATION LEVEL SERIALIZABLE;
+BEGIN
+latihan=*# SELECT COUNT(*) FROM lab9.dokter_jaga WHERE aktif = TRUE;
+ count
+-------
+     2
+(1 row)
+
+latihan=*# UPDATE lab9.dokter_jaga SET aktif = FALSE WHERE dokter_id = 1;
+UPDATE 1
+latihan=*# COMMIT;
+COMMIT
+
+## Sesi B (output mentah terminal)
+latihan=# BEGIN ISOLATION LEVEL SERIALIZABLE;
+BEGIN
+latihan=*# SELECT COUNT(*) FROM lab9.dokter_jaga WHERE aktif = TRUE;
+ count
+-------
+     2
+(1 row)
+
+latihan=*# UPDATE lab9.dokter_jaga SET aktif = FALSE WHERE dokter_id = 2;
+UPDATE 1
+latihan=*# COMMIT;
+ERROR:  could not serialize access due to read/write dependencies among transactions
+DETAIL:  Reason code: Canceled on identification as a pivot, during commit.
+
+latihan=# SELECT * FROM lab9.dokter_jaga ORDER BY dokter_id;
+ dokter_id | nama | aktif
+-----------+------+-------
+         1 | Ani  | f
+         2 | Budi | t
+(2 rows)
+
+
+### Q28
+Tidak ada output pengujian terminal.
+
+
+### Q29
+Tidak ada output pengujian terminal.
