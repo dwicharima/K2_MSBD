@@ -239,7 +239,7 @@ UPDATE 1
            1 | 700000.00
 (1 row)
 
-##langakh B
+##langkah B
 pagila=*# BEGIN;
 SET TRANSACTION ISOLATION LEVEL READ UNCOMMITTED; 
 SHOW transaction_isolation;
@@ -314,3 +314,558 @@ UPDATE 1
 ------------
  1300000.00
 (1 row)
+
+
+### Q12
+Alat: psql di Docker (msbd-pg), PostgreSQL 17.11, database pagila. Dua terminal (Sesi A dan Sesi B).
+Urutan: 12a (lost update), 12b (update atomik), 12c (saldo tidak cukup).
+
+## Sesi A (output mentah terminal)
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+SELECT * FROM lab9.rekening ORDER BY rekening_id;
+UPDATE 2
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+pagila=# BEGIN;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+pagila=*# UPDATE lab9.rekening SET saldo = 990000 WHERE rekening_id = 1;
+COMMIT;
+UPDATE 1
+COMMIT
+pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+ rekening_id |   saldo   
+-------------+-----------
+           1 | 990000.00
+(1 row)
+
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+UPDATE 2
+pagila=# BEGIN;
+UPDATE lab9.rekening SET saldo = saldo - 10000 WHERE rekening_id = 1 AND saldo >= 10000;
+BEGIN
+UPDATE 1
+pagila=*# COMMIT;
+COMMIT
+pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+ rekening_id |   saldo   
+-------------+-----------
+           1 | 980000.00
+(1 row)
+
+pagila=# UPDATE lab9.rekening SET saldo = 15000 WHERE rekening_id = 1;
+BEGIN;
+UPDATE lab9.rekening SET saldo = saldo - 10000 WHERE rekening_id = 1 AND saldo >= 10000;
+UPDATE 1
+BEGIN
+UPDATE 1
+pagila=*# COMMIT;
+COMMIT
+pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+ rekening_id |  saldo  
+-------------+---------
+           1 | 5000.00
+(1 row)
+
+## Sesi B (output mentah terminal)
+pagila=# BEGIN;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+pagila=*# UPDATE lab9.rekening SET saldo = 990000 WHERE rekening_id = 1;
+COMMIT;
+UPDATE 1
+COMMIT
+pagila=# BEGIN;
+UPDATE lab9.rekening SET saldo = saldo - 10000 WHERE rekening_id = 1 AND saldo >= 10000;
+BEGIN
+UPDATE 1
+pagila=*# COMMIT;
+COMMIT
+pagila=# BEGIN;
+UPDATE lab9.rekening SET saldo = saldo - 10000 WHERE rekening_id = 1 AND saldo >= 10000;
+BEGIN
+UPDATE 0
+pagila=*# COMMIT;
+COMMIT
+
+
+### Q13
+Alat: psql di Docker (msbd-pg), PostgreSQL 17.11. Tiga terminal: Sesi A, Sesi B, Pengamat.
+
+## Sesi A (output mentah terminal)
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+SELECT * FROM lab9.rekening ORDER BY rekening_id;
+UPDATE 2
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+pagila=# BEGIN;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1 FOR UPDATE;
+BEGIN
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+pagila=*# UPDATE lab9.rekening SET saldo = 990000 WHERE rekening_id = 1;
+COMMIT;
+UPDATE 1
+COMMIT
+pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+ rekening_id |   saldo   
+-------------+-----------
+           1 | 980000.00
+(1 row)
+
+## Sesi B (output mentah terminal)
+pagila=# SET application_name = 'Sesi B';
+SET
+pagila=# BEGIN;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1 FOR UPDATE;
+BEGIN
+ rekening_id |   saldo   
+-------------+-----------
+           1 | 990000.00
+(1 row)
+
+pagila=*# UPDATE lab9.rekening SET saldo = 980000 WHERE rekening_id = 1;   -- 990000 - 10000
+COMMIT;
+UPDATE 1
+COMMIT
+
+## Pengamat (output mentah terminal)
+pagila=# SET application_name = 'Pengamat';
+SET
+pagila=# SELECT b.application_name AS menunggu, b.wait_event_type, b.wait_event,
+       a.application_name AS diblokir_oleh
+FROM pg_stat_activity b
+JOIN pg_stat_activity a ON a.pid = ANY (pg_blocking_pids(b.pid))
+WHERE b.application_name LIKE 'Sesi%';
+ menunggu | wait_event_type |  wait_event   | diblokir_oleh 
+----------+-----------------+---------------+---------------
+ Sesi B   | Lock            | transactionid | Sesi A
+(1 row)
+
+
+### Q14
+Alat: psql di Docker (msbd-pg), PostgreSQL 17.11. Tabel bantu lab9.rekening_versi (dihapus di akhir).
+
+## Sesi A (output mentah terminal)
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+SELECT * FROM lab9.rekening ORDER BY rekening_id;
+UPDATE 2
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+pagila=# DROP TABLE IF EXISTS lab9.rekening_versi;
+CREATE TABLE lab9.rekening_versi (
+    rekening_id INT PRIMARY KEY,
+    pemilik     TEXT NOT NULL,
+    saldo       NUMERIC(12,2) NOT NULL CHECK (saldo >= 0),
+    version_no  INT NOT NULL DEFAULT 1
+);
+INSERT INTO lab9.rekening_versi (rekening_id, pemilik, saldo)
+SELECT rekening_id, pemilik, saldo FROM lab9.rekening;
+SELECT * FROM lab9.rekening_versi ORDER BY rekening_id;
+NOTICE:  table "rekening_versi" does not exist, skipping
+DROP TABLE
+CREATE TABLE
+INSERT 0 2
+ rekening_id | pemilik |   saldo    | version_no 
+-------------+---------+------------+------------
+           1 | Ani     | 1000000.00 |          1
+           2 | Budi    | 1000000.00 |          1
+(2 rows)
+
+pagila=# BEGIN;
+SELECT rekening_id, saldo, version_no FROM lab9.rekening_versi WHERE rekening_id = 1;
+BEGIN
+ rekening_id |   saldo    | version_no 
+-------------+------------+------------
+           1 | 1000000.00 |          1
+(1 row)
+
+pagila=*# UPDATE lab9.rekening_versi SET saldo = 1100000, version_no = version_no + 1
+WHERE rekening_id = 1 AND version_no = 1;
+COMMIT;
+UPDATE 1
+COMMIT
+pagila=# SELECT rekening_id, saldo, version_no FROM lab9.rekening_versi WHERE rekening_id = 1;  -- 1300000, versi 3
+ rekening_id |   saldo    | version_no 
+-------------+------------+------------
+           1 | 1300000.00 |          3
+(1 row)
+
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+SELECT * FROM lab9.rekening ORDER BY rekening_id;
+UPDATE 2
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+pagila=# BEGIN;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+pagila=*# UPDATE lab9.rekening SET saldo = 1100000 WHERE rekening_id = 1 AND saldo = 1000000;
+COMMIT;
+UPDATE 1
+COMMIT
+pagila=# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1100000.00
+(1 row)
+
+pagila=# UPDATE lab9.rekening_versi SET saldo = 1000000, version_no = 1 WHERE rekening_id = 1;
+UPDATE 1
+pagila=# UPDATE lab9.rekening_versi SET saldo = saldo + 100000, version_no = version_no + 1 WHERE rekening_id = 1;
+UPDATE lab9.rekening_versi SET saldo = saldo - 100000, version_no = version_no + 1 WHERE rekening_id = 1;
+SELECT rekening_id, saldo, version_no FROM lab9.rekening_versi WHERE rekening_id = 1;
+UPDATE 1
+UPDATE 1
+ rekening_id |   saldo    | version_no 
+-------------+------------+------------
+           1 | 1000000.00 |          3
+(1 row)
+
+## Sesi B (output mentah terminal)
+pagila=# BEGIN;
+SELECT rekening_id, saldo, version_no FROM lab9.rekening_versi WHERE rekening_id = 1;
+BEGIN
+ rekening_id |   saldo    | version_no 
+-------------+------------+------------
+           1 | 1000000.00 |          1
+(1 row)
+
+pagila=*# UPDATE lab9.rekening_versi SET saldo = 1200000, version_no = version_no + 1
+WHERE rekening_id = 1 AND version_no = 1;
+UPDATE 0
+pagila=*# ROLLBACK;
+ROLLBACK
+pagila=# BEGIN;
+SELECT rekening_id, saldo, version_no FROM lab9.rekening_versi WHERE rekening_id = 1;   -- 1100000, versi 2
+UPDATE lab9.rekening_versi SET saldo = 1300000, version_no = version_no + 1
+WHERE rekening_id = 1 AND version_no = 2;                                              -- UPDATE 1
+COMMIT;
+BEGIN
+ rekening_id |   saldo    | version_no 
+-------------+------------+------------
+           1 | 1100000.00 |          2
+(1 row)
+
+UPDATE 1
+COMMIT
+pagila=# BEGIN;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+pagila=*# UPDATE lab9.rekening SET saldo = 1200000 WHERE rekening_id = 1 AND saldo = 1000000;
+UPDATE 0
+pagila=*# ROLLBACK;
+ROLLBACK
+pagila=# BEGIN;
+SELECT rekening_id, saldo, version_no FROM lab9.rekening_versi WHERE rekening_id = 1;  -- 1000000, versi 1
+BEGIN
+ rekening_id |   saldo    | version_no 
+-------------+------------+------------
+           1 | 1000000.00 |          1
+(1 row)
+
+pagila=*# UPDATE lab9.rekening_versi SET saldo = 1200000, version_no = version_no + 1
+WHERE rekening_id = 1 AND version_no = 1;
+UPDATE 0
+pagila=*# UPDATE lab9.rekening_versi SET saldo = 1200000, version_no = version_no + 1
+WHERE rekening_id = 1 AND saldo = 1000000;
+UPDATE 1
+pagila=*# ROLLBACK;
+ROLLBACK
+pagila=# DROP TABLE lab9.rekening_versi;
+UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+DROP TABLE
+UPDATE 2
+
+
+### Q15
+Alat: psql di Docker (msbd-pg), PostgreSQL 17.11.
+Catatan: percobaan pertama terpotong (\timing menelan perintah berikutnya, Sesi A tidak masuk transaksi REPEATABLE READ), lalu diulang. Output di bawah adalah percobaan kedua.
+
+## Sesi A (output mentah terminal)
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+SELECT * FROM lab9.rekening ORDER BY rekening_id;
+UPDATE 2
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+pagila=# \timing on
+Timing is on.
+pagila=# BEGIN ISOLATION LEVEL REPEATABLE READ;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+SELECT pg_current_snapshot();
+BEGIN
+Time: 0.282 ms
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+Time: 0.649 ms
+ pg_current_snapshot 
+---------------------
+ 1492:1492:
+(1 row)
+
+Time: 0.189 ms
+pagila=*# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+Time: 0.226 ms
+pagila=*# SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+SELECT pg_current_snapshot();
+SELECT mode, granted FROM pg_locks
+WHERE pid = pg_backend_pid() AND locktype = 'relation' AND relation = 'lab9.rekening'::regclass;
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1000000.00
+(1 row)
+
+Time: 0.296 ms
+ pg_current_snapshot 
+---------------------
+ 1492:1492:
+(1 row)
+
+Time: 0.147 ms
+      mode       | granted 
+-----------------+---------
+ AccessShareLock | t
+(1 row)
+
+Time: 0.377 ms
+pagila=*# COMMIT;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+COMMIT
+Time: 0.130 ms
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1100000.00
+(1 row)
+
+Time: 0.191 ms
+pagila=# \timing off
+Timing is off.
+
+## Sesi B (output mentah terminal)
+pagila=# BEGIN;
+UPDATE lab9.rekening SET saldo = saldo + 100000 WHERE rekening_id = 1;
+SELECT pg_current_xact_id() AS xid_sesi_b;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 1;
+BEGIN
+UPDATE 1
+ xid_sesi_b 
+------------
+       1492
+(1 row)
+
+ rekening_id |   saldo    
+-------------+------------
+           1 | 1100000.00
+(1 row)
+
+pagila=*# COMMIT;
+COMMIT
+
+
+### Q16
+Alat: psql di Docker (msbd-pg), PostgreSQL 17.11.
+
+## Sesi A (output mentah terminal)
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+SELECT * FROM lab9.rekening ORDER BY rekening_id;
+UPDATE 2
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+pagila=# SELECT xmin, xmax, ctid, rekening_id, saldo FROM lab9.rekening ORDER BY rekening_id;
+ xmin | xmax |  ctid  | rekening_id |   saldo    
+------+------+--------+-------------+------------
+ 1494 |    0 | (0,34) |           1 | 1000000.00
+ 1494 |    0 | (0,35) |           2 | 1000000.00
+(2 rows)
+
+pagila=# SELECT xmin, xmax, ctid, saldo, pg_xact_status(xmax::text::xid8) AS status_xmax
+FROM lab9.rekening WHERE rekening_id = 1;
+ xmin | xmax |  ctid  |   saldo    | status_xmax 
+------+------+--------+------------+-------------
+ 1494 | 1495 | (0,34) | 1000000.00 | in progress
+(1 row)
+
+pagila=# SELECT xmin, xmax, ctid, saldo, pg_xact_status(xmax::text::xid8) AS status_xmax
+FROM lab9.rekening WHERE rekening_id = 1;
+ xmin | xmax |  ctid  |   saldo    | status_xmax 
+------+------+--------+------------+-------------
+ 1494 | 1495 | (0,34) | 1000000.00 | aborted
+(1 row)
+
+pagila=# BEGIN;
+SELECT pg_current_xact_id() AS xid_sesi_a;
+SELECT rekening_id, saldo FROM lab9.rekening WHERE rekening_id = 2 FOR UPDATE;
+BEGIN
+ xid_sesi_a 
+------------
+       1496
+(1 row)
+
+ rekening_id |   saldo    
+-------------+------------
+           2 | 1000000.00
+(1 row)
+
+pagila=*# ROLLBACK;
+ROLLBACK
+
+## Sesi B (output mentah terminal)
+pagila=# BEGIN;
+UPDATE lab9.rekening SET saldo = saldo + 1 WHERE rekening_id = 1;
+SELECT pg_current_xact_id() AS xid_sesi_b;
+SELECT xmin, xmax, ctid, saldo FROM lab9.rekening WHERE rekening_id = 1;   -- xmin = xid B, xmax = 0, ctid baru
+BEGIN
+UPDATE 1
+ xid_sesi_b 
+------------
+       1495
+(1 row)
+
+ xmin | xmax |  ctid  |   saldo    
+------+------+--------+------------
+ 1495 |    0 | (0,36) | 1000001.00
+(1 row)
+
+pagila=*# ROLLBACK;
+ROLLBACK
+pagila=# SELECT xmin, xmax, ctid, saldo FROM lab9.rekening WHERE rekening_id = 2;
+ xmin | xmax |  ctid  |   saldo    
+------+------+--------+------------
+ 1494 | 1496 | (0,35) | 1000000.00
+(1 row)
+
+
+### Q17
+Alat: psql di Docker (msbd-pg), PostgreSQL 17.11. Tabel demo lab9.mvcc_demo (autovacuum dimatikan hanya untuk tabel ini; dihapus di akhir).
+
+## Sesi A (output mentah terminal)
+pagila=# UPDATE lab9.rekening SET saldo = 1000000 WHERE rekening_id IN (1,2);
+SELECT * FROM lab9.rekening ORDER BY rekening_id;
+UPDATE 2
+ rekening_id | pemilik |   saldo    
+-------------+---------+------------
+           1 | Ani     | 1000000.00
+           2 | Budi    | 1000000.00
+(2 rows)
+
+pagila=# DROP TABLE IF EXISTS lab9.mvcc_demo;
+CREATE TABLE lab9.mvcc_demo (id INT PRIMARY KEY, nilai INT) WITH (autovacuum_enabled = false);
+INSERT INTO lab9.mvcc_demo VALUES (1, 0);
+UPDATE lab9.mvcc_demo SET nilai = nilai + 1 WHERE id = 1;
+UPDATE lab9.mvcc_demo SET nilai = nilai + 1 WHERE id = 1;
+UPDATE lab9.mvcc_demo SET nilai = nilai + 1 WHERE id = 1;
+UPDATE lab9.mvcc_demo SET nilai = nilai + 1 WHERE id = 1;
+UPDATE lab9.mvcc_demo SET nilai = nilai + 1 WHERE id = 1;
+SELECT * FROM lab9.mvcc_demo;
+NOTICE:  table "mvcc_demo" does not exist, skipping
+DROP TABLE
+CREATE TABLE
+INSERT 0 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+UPDATE 1
+ id | nilai 
+----+-------
+  1 |     5
+(1 row)
+
+pagila=# UPDATE lab9.mvcc_demo SET nilai = nilai + 1 WHERE id = 1;
+VACUUM (VERBOSE) lab9.mvcc_demo;
+UPDATE 1
+INFO:  vacuuming "pagila.lab9.mvcc_demo"
+INFO:  finished vacuuming "pagila.lab9.mvcc_demo": index scans: 0
+pages: 0 removed, 1 remain, 1 scanned (100.00% of total)
+tuples: 5 removed, 2 remain, 1 are dead but not yet removable
+removable cutoff: 1505, which was 1 XIDs old when operation ended
+new relfrozenxid: 1504, which is 6 XIDs ahead of previous value
+frozen: 0 pages from table (0.00% of total) had 0 tuples frozen
+index scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed
+avg read rate: 0.000 MB/s, avg write rate: 28.758 MB/s
+buffer usage: 15 hits, 0 misses, 3 dirtied
+WAL usage: 2 records, 0 full page images, 305 bytes
+system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+VACUUM
+pagila=# VACUUM (VERBOSE) lab9.mvcc_demo;
+INFO:  vacuuming "pagila.lab9.mvcc_demo"
+INFO:  finished vacuuming "pagila.lab9.mvcc_demo": index scans: 0
+pages: 0 removed, 1 remain, 1 scanned (100.00% of total)
+tuples: 1 removed, 1 remain, 0 are dead but not yet removable
+removable cutoff: 1506, which was 0 XIDs old when operation ended
+new relfrozenxid: 1505, which is 1 XIDs ahead of previous value
+frozen: 0 pages from table (0.00% of total) had 0 tuples frozen
+index scan not needed: 0 pages from table (0.00% of total) had 0 dead item identifiers removed
+avg read rate: 0.000 MB/s, avg write rate: 25.121 MB/s
+buffer usage: 20 hits, 0 misses, 1 dirtied
+WAL usage: 3 records, 1 full page images, 8555 bytes
+system usage: CPU: user: 0.00 s, system: 0.00 s, elapsed: 0.00 s
+VACUUM
+pagila=# DROP TABLE lab9.mvcc_demo;
+DROP TABLE
+
+## Sesi B (output mentah terminal)
+pagila=# BEGIN ISOLATION LEVEL REPEATABLE READ;
+SELECT * FROM lab9.mvcc_demo;
+BEGIN
+ id | nilai 
+----+-------
+  1 |     5
+(1 row)
+
+pagila=*# COMMIT;
+COMMIT
