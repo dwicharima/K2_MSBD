@@ -837,3 +837,68 @@ VACUUM
 pagila=# DROP TABLE lab9.mvcc_demo;
 DROP TABLE
 ```
+
+### Q18
+Bandingkan FOR UPDATE, FOR NO KEY UPDATE, FOR SHARE, dan FOR KEY SHARE. Jelaskan tujuan umum dan kapan transaksi lain mungkin terhalang.
+>> Keempat jenis lock memiliki tingkat perlindungan dan kompatibilitas berbeda. Transaksi lain dapat menunggu apabila lock yang dimintanya bertentangan dengan lock yang sudah dipegang transaksi pertama. FOR UPDATE mengunci baris secara kuat untuk melindungi pembaruan, termasuk perubahan kolom yang menjadi key. FOR NO KEY UPDATE digunakan ketika baris akan diperbarui, tetapi perubahan tersebut tidak mengubah key yang relevan bagi foreign key. FOR SHARE mengizinkan transaksi lain membaca dan mengambil lock bersama, tetapi dapat menghalangi transaksi yang ingin mengubah baris. FOR KEY SHARE lock yang lebih ringan, terutama untuk melindungi key baris agar tidak dihapus atau diubah dengan cara yang bertentangan.
+```
+
+### Q19
+Di Sesi A, mulai transaksi dan kunci rekening 1 dengan SELECT ... FOR UPDATE. Di Sesi B, coba mengunci baris yang sama. Catat perilaku menunggu dan apa yang terjadi setelah Sesi A COMMIT.
+>> Sesi B tertahan sampai Sesi A melakukan COMMIT. Ini adalah rowlock, bukan deadlock.
+```
+
+### Q20 — Deadlock. 
+Sesi A mulai transaksi dan mengunci rekening 1; Sesi B mulai transaksi dan mengunci rekening 2. Selanjutnya Sesi A mencoba mengunci rekening 2, lalu Sesi B mencoba mengunci rekening 1. Rekam sesi mana yang mendapat deadlock error dan SQLSTATE 40P01.
+>> Sesi yang terkena deadlock adalah Sesi B. Pada Sesi B yang terkena deadlock, akan memunculkan pesan 
+ERROR:  deadlock detected
+DETAIL:  Process 1961 waits for ShareLock on transaction 1230; blocked by process 834.
+Process 834 waits for ShareLock on transaction 1231; blocked by process 1961.
+HINT:  See server log for query details.
+CONTEXT:  while locking tuple (0,1) in relation "rekening"
+```
+
+### Q21
+Ulangi dengan urutan penguncian konsisten: semua sesi mengunci rekening_id dari nilai terkecil ke terbesar. Apakah deadlock dapat dihindari pada skenario ini?
+>> Pada skenario ini, urutan lock yang konsisten dapat menghindari deadlock karena kedua transaksi tidak saling memegang lock dalam urutan yang berlawanan.
+```
+
+### Q22
+Jelaskan perbedaan deadlock dan antrean lock panjang. Gunakan contoh transaksi yang menahan lock terlalu lama.
+>> Deadlock: dua atau lebih transaksi membentuk siklus saling menunggu. PostgreSQL akan mendeteksinya dan membatalkan salah satu transaksi.
+Antrean lock panjang: transaksi menunggu lock yang dipegang transaksi lain, tetapi tidak terbentuk siklus deadlock.
+Contoh antrean lock panjang:
+
+Dijalankan di Sesi A
+BEGIN;
+
+SELECT *
+FROM lab9.rekening
+WHERE rekening_id = 1
+FOR UPDATE;
+
+-- Biarkan transaksi tetap terbuka.
+
+Lalu, dijalankan pada Sesi B
+BEGIN;
+
+SELECT *
+FROM lab9.rekening
+WHERE rekening_id = 1
+FOR UPDATE;
+
+Sesi B menunggu sampai Sesi A menyelesaikan transaksi. Jika Sesi A terlalu lama dibiarkan terbuka, antrean tersebut juga bisa berlangsung lama.
+
+Akhiri transaksi Sesi A dengan COMMIT;, kemudian selesaikan Sesi B dengan COMMIT; juga.
+
+Deadlock membutuhkan siklus saling menunggu, sedangkan antrean lock panjang cukup terjadi karena satu transaksi menahan lock terlalu lama.
+```
+
+### Q23
+Bandingkan lock_timeout, statement_timeout, idle_in_transaction_session_timeout, dan deadlock_timeout. Jelaskan fungsi masing-masing.
+>> lock_timeout : Membatasi berapa lama perintah menunggu untuk mendapatkan lock.
+statement_timeout : Membatasi durasi keseluruhan eksekusi sebuah perintah SQL.
+idle_in_transaction_session_timeout : Mengakhiri sesi yang terlalu lama tidak aktif ketika masih berada dalam transaksi terbuka.
+deadlock_timeout : Menentukan berapa lama PostgreSQL menunggu sebelum melakukan pemeriksaan deadlock pada situasi lock yang menunggu.
+
+Keempat parameter memiliki fungsi berbeda. lock_timeout membatasi waktu tunggu lock, statement_timeout membatasi waktu eksekusi query, idle_in_transaction_session_timeout mengatasi transaksi yang dibiarkan diam, sedangkan deadlock_timeout mengatur kapan PostgreSQL mulai memeriksa deadlock.
