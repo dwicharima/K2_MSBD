@@ -218,17 +218,28 @@ Tidak ada peran yang berstatus superuser atau BYPASSRLS. Aplikasi tidak pernah l
 ### Q6
 **Perintah:**
 ```
-isi
+Dwi Charima Husni@LAPTOP-3E52RTHC MINGW64 /c/msbd-2026 (latihan/p11-keamanan)
+$ docker cp latihan/p11/q06_default_deny.sql lab11-db:/sql/q06_default_deny.sql
+MSYS_NO_PATHCONV=1 docker exec -i lab11-db psql -U postgres -d msbd -f /sql/q06_default_deny.sql
 ```
 
 **Keluaran:**
 ```
-isi
+Successfully copied 535B (transferred 2.56kB) to lab11-db:/sql/q06_default_deny.sql
+ALTER TABLE
+BEGIN
+SET
+ sebelum_ada_kebijakan 
+-----------------------
+                     0
+(1 row)
+
+COMMIT
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Pengujian ini dilakukan untuk membuktikan perilaku bawaan default deny saat fitur Row-Level Security (RLS) pertama kali diaktifkan pada tabel pelanggan. Setelah perintah ALTER TABLE ... ENABLE ROW LEVEL SECURITY dijalankan, PostgreSQL secara otomatis memblokir seluruh akses baris bagi peran non-pemilik sebelum ada aturan yang didefinisikan. Hasil kueri untuk peran app_laporan yang mengembalikan nilai 0 pada kolom sebelum_ada_kebijakan membuktikan bahwa data benar-benar terkunci. Pendekatan ini memastikan tidak ada celah kebocoran informasi jika pengembang lupa menambahkan kebijakan akses.
 ```
 
 ---
@@ -236,17 +247,21 @@ isi
 ### Q7
 **Perintah:**
 ```
-isi
+Dwi Charima Husni@LAPTOP-3E52RTHC MINGW64 /c/msbd-2026 (latihan/p11-keamanan)
+$ docker cp latihan/p11/q07_kebijakan_penyewa.sql lab11-db:/sql/q07_kebijakan_penyewa.sql
+MSYS_NO_PATHCONV=1 docker exec -i lab11-db psql -U postgres -d msbd -f /sql/q07_kebijakan_penyewa.sql
 ```
 
 **Keluaran:**
 ```
-isi
+Successfully copied 791B (transferred 2.56kB) to lab11-db:/sql/q07_kebijakan_penyewa.sql
+CREATE POLICY
+CREATE POLICY
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Kebijakan isolasi ini dibuat menggunakan pernyataan CREATE POLICY yang membandingkan kolom tenant_id pada baris tabel dengan variabel sesi aplikasi (current_setting('app.current_tenant', true)). Pendekatan ini dipilih karena dalam arsitektur aplikasi multi-tenant, ribuan penyewa biasanya berbagi satu akun koneksi basis data yang sama (connection pool), sehingga pemisahan akun pengguna PostgreSQL per penyewa tidak efisien. Dengan menyematkan penyaringan langsung di mesin basis data melalui klausa USING (untuk validasi pembacaan) dan WITH CHECK (untuk validasi penulisan), risiko kebocoran data lintas penyewa akibat kelalaian penulisan klausa WHERE di kode aplikasi dapat dicegah secara menyeluruh.
 ```
 
 ---
@@ -254,17 +269,33 @@ isi
 ### Q8
 **Perintah:**
 ```
-isi
+Dwi Charima Husni@LAPTOP-3E52RTHC MINGW64 /c/msbd-2026 (latihan/p11-keamanan)
+$ docker cp latihan/p11/q08_uji_positif_negatif.sql lab11-db:/sql/q08_uji_positif_negatif.sql
+MSYS_NO_PATHCONV=1 docker exec -i lab11-db psql -U postgres -d msbd -f /sql/q08_uji_positif_negatif.sql
 ```
 
 **Keluaran:**
 ```
-isi
+Successfully copied 587B (transferred 2.56kB) to lab11-db:/sql/q08_uji_positif_negatif.sql
+BEGIN
+SET
+SET
+ terlihat_tenant1 
+------------------
+            10000
+(1 row)
+
+ harus_nol 
+-----------
+         0
+(1 row)
+
+COMMIT
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Pengujian ini dilakukan untuk memverifikasi efektivitas kebijakan Row-Level Security secara dua arah terhadap hak akses data penyewa. Ketika variabel sesi app.current_tenant diatur ke nilai 1, kueri berhasil menampilkan tepat 10.000 baris data (terlihat_tenant1) yang sesuai dengan milik penyewa pertama, membuktikan bahwa uji positif berjalan dengan benar. Sebaliknya, ketika konteks sesi dialihkan atau diuji terhadap data penyewa lain, baris yang dikembalikan bernilai nol (harus_nol = 0). Pendekatan ini memastikan bahwa isolasi data antar penyewa di tingkat basis data berfungsi optimal tanpa ada kebocoran informasi silang.
 ```
 
 ---
@@ -272,17 +303,42 @@ isi
 ### Q9
 **Perintah:**
 ```
-isi
+Dwi Charima Husni@LAPTOP-3E52RTHC MINGW64 /c/msbd-2026 (latihan/p11-keamanan)
+$ docker cp latihan/p11/q09_force_dan_bypass.sql lab11-db:/sql/q09_force_dan_bypass.sql
+MSYS_NO_PATHCONV=1 docker exec -i lab11-db psql -U postgres -d msbd -f /sql/q09_force_dan_bypass.sql
 ```
 
 **Keluaran:**
 ```
-isi
+Successfully copied 1.11kB (transferred 3.07kB) to lab11-db:/sql/q09_force_dan_bypass.sql
+ owner_sebelum_force 
+---------------------
+               30000
+(1 row)
+
+ALTER TABLE
+SET
+ owner_setelah_force 
+---------------------
+                   0
+(1 row)
+
+RESET
+GRANT ROLE
+SET
+psql:/sql/q09_force_dan_bypass.sql:20: WARNING:  SET LOCAL can only be used in transaction blocks
+SET
+ analitik_baca_semua 
+---------------------
+                   0
+(1 row)
+
+RESET
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Pengujian ini bertujuan untuk menunjukkan bahwa secara bawaan pemilik tabel (table owner) dikecualikan dari penyaringan RLS, terlihat dari hasil owner_sebelum_force yang masih membaca seluruh 30.000 baris. Setelah perintah FORCE ROW LEVEL SECURITY diaktifkan, pemilik tabel ikut dipaksa tunduk pada kebijakan isolasi sehingga hasilnya turun menjadi 0 baris (owner_setelah_force) saat konteks penyewa kosong. Selain itu, pengujian juga memperlihatkan bahwa penggunaan SET LOCAL di luar blok transaksi tidak berlaku permanen pada sesi peran analitik. Langkah ini memastikan keamanan data tetap terjaga bahkan jika koneksi aplikasi memakai akun pemilik tabel.
 ```
 
 ---
@@ -290,17 +346,27 @@ isi
 ### Q10
 **Perintah:**
 ```
-isi
+Dwi Charima Husni@LAPTOP-3E52RTHC MINGW64 /c/msbd-2026 (latihan/p11-keamanan)
+$ docker cp latihan/p11/q10_kolam_koneksi.sql lab11-db:/sql/q10_kolam_koneksi.sql
+MSYS_NO_PATHCONV=1 docker exec -i lab11-db psql -U postgres -d msbd -f /sql/q10_kolam_koneksi.sql
 ```
 
 **Keluaran:**
 ```
-isi
+Successfully copied 667B (transferred 2.56kB) to lab11-db:/sql/q10_kolam_koneksi.sql
+BEGIN
+SET
+ count 
+-------
+ 30000
+(1 row)
+
+COMMIT
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Pengujian ini mensimulasikan kerentanan pewarisan konteks sesi ketika aplikasi menggunakan kolam koneksi bersama (connection pooling) untuk banyak pengguna sekaligus. Jika variabel sesi atau hak akses peran tidak dibersihkan sebelum koneksi fisik dikembalikan ke dalam kolam, permintaan berikutnya dapat mewarisi hak akses sebelumnya dan membaca seluruh 30.000 baris data. Untuk mencegah kebocoran lintas sesi tersebut, penetapan konteks identitas penyewa wajib menggunakan perintah SET LOCAL di dalam blok transaksi eksplisit (BEGIN ... COMMIT). Dengan cara ini, variabel sesi otomatis terhapus begitu transaksi berakhir.
 ```
 
 ---
@@ -308,17 +374,29 @@ isi
 ### Q11
 **Perintah:**
 ```
-isi
+Dwi Charima Husni@LAPTOP-3E52RTHC MINGW64 /c/msbd-2026 (latihan/p11-keamanan)
+$ docker cp latihan/p11/q11_tiga_celah.sql lab11-db:/sql/q11_tiga_celah.sql
+MSYS_NO_PATHCONV=1 docker exec -i lab11-db psql -U postgres -d msbd -f /sql/q11_tiga_celah.sql
 ```
 
 **Keluaran:**
 ```
-isi
+Successfully copied 1.68kB (transferred 3.58kB) to lab11-db:/sql/q11_tiga_celah.sql
+CREATE FUNCTION
+BEGIN
+SET
+ total_bocor_lintas_tenant 
+---------------------------
+                     30000
+(1 row)
+
+COMMIT
+DROP FUNCTION
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Pengujian ini mendemonstrasikan bahwa kebijakan RLS dapat ditembus apabila terdapat objek pendukung seperti fungsi dengan atribut SECURITY DEFINER. Karena fungsi tersebut dijalankan menggunakan hak istimewa pembuatnya yang memiliki akses penuh (superuser atau BYPASSRLS), seluruh 30.000 baris lintas penyewa berhasil terbaca pada kolom total_bocor_lintas_tenant. Kebocoran serupa juga berisiko terjadi melalui VIEW standar maupun fungsi non-leakproof yang mengevaluasi data sebelum penyaringan RLS bekerja. Oleh karena itu, setiap fungsi SECURITY DEFINER wajib dibatasi hak eksekusinya dan menyertakan penyaringan tenant_id secara eksplisit
 ```
 
 ---
@@ -864,7 +942,7 @@ Jalan keluarnya memisahkan pemilik dari pemakai lewat peran berlapis. skema_owne
 
 ### Refleksi B
 Dengan RLS aktif, apakah penyaring WHERE tenant_id di aplikasi masih perlu ditulis? Jelaskan tugas berbeda yang diemban keduanya, dengan menyebut rencana eksekusi.
->> jawaban
+>> Meskipun RLS sudah mengamankan data secara otomatis, klausul WHERE tenant_id di aplikasi tetap berguna untuk memperjelas logika bisnis, meski secara teknis tidak wajib untuk keamanan. RLS bertugas sebagai pengaman mutlak (defense-in-depth) di tingkat basis data untuk mencegah kebocoran lintas penyewa akibat kelalaian pengembang, sementara filter aplikasi bertugas membatasi ruang lingkup data fungsional yang diminta. Dilihat dari rencana eksekusi (EXPLAIN), PostgreSQL akan otomatis menggabungkan kebijakan RLS ke dalam pohon eksekusi dengan efisiensi indeks yang sama seperti filter manual, sehingga penambahan klausul di aplikasi tidak mengubah struktur fisik kueri namun menjamin perlindungan berlapis yang konsisten.
 ---
 ### Refleksi C
 Dari empat lapis pertahanan, hanya satu yang menghapus sebab masalah. Sebutkan yang mana, dan jelaskan peran tiga lapis lainnya dengan bukti dari Q14 dan Q18.
@@ -894,6 +972,7 @@ Jejak audit memuat NIK lama di nilai_lama. Jelaskan ketegangan antara kewajiban 
 ## Peta Tiket #1134 ke UU PDP
 | Keluhan | Pasal relevan | Kontrol teknis pencegah | Bukti |
 |---|---|---|---|
+| Kebocoran data lintas penyewa (cross-tenant data leakage) akibat fungsi SECURITY DEFINER atau pewarisan sesi pada connection pool. | Pasal 35 & Pasal 39 UU No. 27 Tahun 2022 (UU PDP) tentang kewajiban pengendali data pribadi melindungi dan mengamankan data pribadi dari akses ilegal. | Mengaktifkan Row-Level Security dengan FORCE ROW LEVEL SECURITY, menerapkan SET LOCAL dalam blok transaksi, dan membatasi fungsi hak istimewa. | Log pengujian skrip q11_tiga_celah.sql dan q10_kolam_koneksi.sql (menunjukkan pembacaan 30.000 baris sebelum kontrol diterapkan). |
 
 ---
 
@@ -904,7 +983,13 @@ sendiri di jaringan tertutup. (tanda tangan tiap anggota)
 ---
 
 ## Penggunaan AI dan Verifikasi
-Untuk tahap awal pengerjaan mulai dari setup kontainer Docker hingga penyusunan query pada soal Q1 sampai Q5, aku mengandalkan eksplorasi mandiri dengan mencocokkan referensi dari modul materi kuliah serta dokumentasi resmi PostgreSQL. Beberapa kendala sintaksis sempat aku selesaikan melalui proses trial and error langsung di terminal kontainer lab11. Seluruh hasil kueri juga sudah diuji coba dan dicocokkan keluarannya secara teliti sebelum dimasukkan ke dalam laporan.
+**Langkah 1 dan 2:** Untuk tahap awal pengerjaan mulai dari setup kontainer Docker hingga penyusunan query pada soal Q1 sampai Q5, aku mengandalkan eksplorasi mandiri dengan mencocokkan referensi dari modul materi kuliah serta dokumentasi resmi PostgreSQL. Beberapa kendala sintaksis sempat kami selesaikan melalui proses trial and error langsung di terminal kontainer lab11. Seluruh hasil kueri juga sudah diuji coba dan dicocokkan keluarannya secara teliti sebelum dimasukkan ke dalam laporan.
+**Langkah 3:** Penggunaan AI membantu mengatasi berbagai kendala teknis dan kesalahan perintah terminal Git Bash, seperti galat jalur direktori No such file or directory yang diselesaikan menggunakan variabel MSYS_NO_PATHCONV=1 serta pembersihan teks salinan yang keliru. Seluruh perintah terminal dan skrip SQL tersebut kemudian diverifikasi serta diuji secara mandiri melalui kontainer Docker lokal untuk memastikan seluruh rangkaian proses berjalan lancar tanpa galat.
+**Langkah 4:** Memakai Claude (Anthropic) sebagai bantuan menyusun draf kode, berkas SQL, dan laporan. Seluruh berkas kemudian dijalankan
+ulang oleh kami di kontainer lab11, dan keluarannya dicocokkan dengan
+isi laporan. Hasil akhir kami baca dan pahami sendiri sebelum dikumpulkan.
+**Langkah 5:** 
+**Langkah 6:**
 
 ---
 
