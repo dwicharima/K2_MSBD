@@ -5,8 +5,8 @@
 | Agnes Natalia Siregar    | 251402108 | Langkah : Setup lingkungan pengujian, pengerjaan Q00 dan Q1–Q5 |
 | Dwi Charima Husni        | 251402088 | Langkah : Pengerjaan pengujian Q6–Q11, Refleksi B              |
 | Abdullah Zufar Aulia Nst | 251402111 | Langkah : Pengerjaan pengujian Q12–Q18, Reflektif C            |
-|                          | 251402    | Langkah : Pengerjaan pengujian Q19–Q24, Reflektif D            |
-|                          | 251402    | Langkah : Pengerjaan pengujian Q25-Q30, Reflektif E            |
+| Rasyd Arija Azron R      | 251402020 | Langkah : Pengerjaan pengujian Q19–Q24, Reflektif D            |
+| M Fakhry Adrian D        | 251402053 | Langkah : Pengerjaan pengujian Q25-Q30, Reflektif E            |
 
 ## Jawaban Q1–Q32
 
@@ -1232,91 +1232,360 @@ SELECT id, nama, saldo FROM lab11.pelanggan WHERE kota = 'Medan' AND lahir = :'l
 
 ### Q25
 **Perintah:**
-```
-isi
-```
+(.venv) PS C:\Users\Fakhry Adrian\OneDrive\Documents\Tubes_MSBD\K2_MSBD> Get-Content .\latihan\p11\q25_tabel_audit.sql -Raw | docker exec -i lab11-db psql -U postgres -d msbd
 
 **Keluaran:**
-```
-isi
-```
+CREATE TABLE
+CREATE FUNCTION
+DROP TRIGGER
+NOTICE:  trigger "trg_rekam_audit" for relation "lab11.pelanggan" does not exist, skipping
+CREATE TRIGGER
+REVOKE
+REVOKE
+REVOKE
+  trigger_name   | event_manipulation | event_object_table 
+-----------------+--------------------+--------------------
+ trg_rekam_audit | DELETE             | pelanggan
+ trg_rekam_audit | UPDATE             | pelanggan
+(2 rows)
 
 **Alasan Keputusan:**
-```
-isi
-```
+Keputusan menggunakan tabel jejak_audit dan trigger rekam_audit dipilih agar setiap aktivitas UPDATE dan DELETE pada tabel pelanggan dapat tercatat secara otomatis. Trigger digunakan karena pencatatan audit dilakukan langsung oleh database setiap kali terjadi perubahan data, sehingga aplikasi tidak perlu melakukan INSERT audit secara manual. Saya menggunakan SECURITY DEFINER agar fungsi trigger dapat menulis ke tabel audit meskipun pengguna aplikasi tidak memiliki hak akses langsung ke tabel tersebut. Selain itu, penggunaan session_user dipilih agar identitas pengguna yang benar-benar melakukan koneksi tetap tercatat, bukan identitas pemilik fungsi trigger. Hak akses langsung terhadap tabel audit dicabut dari role aplikasi untuk mencegah manipulasi maupun pemalsuan catatan audit.
 
 ---
 
 ### Q26
 **Perintah:**
-```
-isi
-```
+Langkah 1
+msbd=# SELECT id, nama, tenant_id
+FROM lab11.pelanggan
+WHERE id = 3;
+
+SELECT *
+FROM lab11.transaksi
+WHERE pelanggan_id = 3;
+
+Langkah 2
+BEGIN;
+
+SET LOCAL ROLE app_portal;
+SET LOCAL app.tenant = '1';
+
+-- Uji UPDATE.
+UPDATE lab11.pelanggan
+SET kota = kota
+WHERE id = 3;
+
+-- Ganti 13 dengan ID uji milik penyewa 1
+-- yang sudah dipastikan tidak memiliki transaksi.
+DELETE FROM lab11.pelanggan
+WHERE id = 13;
+
+COMMIT;
+
+Langkah 3
+
+SELECT
+    id,
+    waktu,
+    pelaku,
+    aksi,
+    nama_tabel,
+    kunci,
+    nilai_lama,
+    nilai_baru
+FROM lab11.jejak_audit
+ORDER BY id DESC
+LIMIT 20;
+
+Langkah 4
+-- Uji membaca tabel audit.
+SET ROLE app_portal;
+
+SELECT *
+FROM lab11.jejak_audit;
+
+-- Uji memasukkan data audit secara langsung.
+INSERT INTO lab11.jejak_audit (
+    pelaku, aksi, nama_tabel, kunci
+)
+VALUES (
+    'percobaan', 'INSERT', 'lab11.pelanggan', '999'
+);
+
+RESET ROLE;
 
 **Keluaran:**
-```
-isi
-```
+Langkah 1
+ id |    nama     | tenant_id 
+----+-------------+-----------
+  3 | Pelanggan 3 |         1
+(1 row)
+
+  id   | tenant_id | pelanggan_id |  jumlah  |         waktu          
+-------+-----------+--------------+----------+------------------------
+     3 |         1 |            3 | 10010.70 | 2025-01-05 02:00:00+00
+ 24003 |         1 |            3 | 10020.47 | 2025-01-06 02:00:00+00
+ 48003 |         1 |            3 | 10030.24 | 2025-01-07 02:00:00+00
+ 72003 |         1 |            3 | 10040.01 | 2025-01-08 02:00:00+00
+ 96003 |         1 |            3 | 10049.78 | 2025-01-09 02:00:00+00
+(5 rows)
+
+Langkah 2
+d = 13;b11.pelanggandak memiliki transaksi.
+BEGIN
+SET
+SET
+UPDATE 1
+ERROR:  update or delete on table "pelanggan" violates foreign key constraint "transaksi_pelanggan_id_fkey" on table "transaksi"
+DETAIL:  Key (id)=(13) is still referenced from table "transaksi".
+ROLLBACK
+
+Langkah 3
+ id | waktu | pelaku | aksi | nama_tabel | kunci | nilai_lama | nilai_baru 
+----+-------+--------+------+------------+-------+------------+------------
+(0 rows)
+
+Langkah 4
+SET
+ERROR:  permission denied for table jejak_audit
+ERROR:  permission denied for table jejak_audit
+RESET
 
 **Alasan Keputusan:**
-```
-isi
-```
+Keputusan melakukan UPDATE dan DELETE terhadap data pelanggan milik tenant 1 dipilih untuk membuktikan bahwa trigger audit bekerja pada aktivitas perubahan data yang dilakukan oleh pengguna aplikasi. Pengujian menggunakan akun app_portal bertujuan memastikan bahwa aktivitas pengguna biasa tetap dapat dicatat tanpa memberikan hak akses langsung untuk menulis ke tabel audit. Saya juga menguji akses SELECT dan INSERT secara langsung terhadap tabel audit untuk membuktikan bahwa role aplikasi tidak dapat membaca maupun memalsukan catatan audit. Pengujian dilakukan menggunakan data milik tenant sendiri agar tidak melanggar batas isolasi antar-tenant.
 
 ---
 
 ### Q27
 **Perintah:**
-```
-isi
-```
+Langkah 1
+-- Diminta: mendeteksi lonjakan baris per peran.
+-- Dipilih: menghitung aktivitas audit per pelaku.
+-- Alternatif: hanya menghitung total seluruh aktivitas; tidak dipilih karena tidak menunjukkan pelakunya.
+
+SELECT
+    pelaku,
+    COUNT(*) AS jumlah_perubahan
+FROM lab11.jejak_audit
+GROUP BY pelaku
+ORDER BY jumlah_perubahan DESC;
+
+Langkah 2
+-- Diminta: mendeteksi akses di luar jam kerja.
+-- Dipilih: mengubah waktu audit ke zona Asia/Jakarta.
+-- Alternatif: memakai waktu server tanpa zona waktu; tidak dipilih agar konsisten dengan WIB.
+
+SELECT
+    id,
+    waktu,
+    pelaku,
+    aksi,
+    nama_tabel,
+    waktu AT TIME ZONE 'Asia/Jakarta' AS waktu_wib
+FROM lab11.jejak_audit
+WHERE
+    EXTRACT(
+        HOUR FROM waktu AT TIME ZONE 'Asia/Jakarta'
+    ) < 8
+    OR
+    EXTRACT(
+        HOUR FROM waktu AT TIME ZONE 'Asia/Jakarta'
+    ) >= 17
+ORDER BY waktu DESC;
+
+Langkah 3
+-- Diminta: membuat ringkasan aksi.
+-- Dipilih: menghitung jumlah setiap jenis aksi.
+-- Alternatif: menampilkan semua baris audit; tidak dipilih karena kurang ringkas.
+
+SELECT
+    aksi,
+    COUNT(*) AS jumlah_aktivitas
+FROM lab11.jejak_audit
+GROUP BY aksi
+ORDER BY jumlah_aktivitas DESC;
+
 
 **Keluaran:**
-```
-isi
-```
+Langkah 1
+ pelaku | jumlah_perubahan 
+--------+------------------
+(0 rows)
+
+Langkah 2
+ id | waktu | pelaku | aksi | nama_tabel | waktu_wib 
+----+-------+--------+------+------------+-----------
+(0 rows)
+
+Langkah 3
+ aksi | jumlah_aktivitas 
+------+------------------
+(0 rows)
 
 **Alasan Keputusan:**
-```
-isi
-```
+Keputusan menggunakan tiga jenis query pemeriksaan dipilih karena setiap query dapat menunjukkan pola aktivitas yang berbeda. Query pertama mengelompokkan jumlah perubahan berdasarkan pelaku untuk menemukan pengguna yang memiliki aktivitas tidak biasa atau jumlah perubahan yang jauh lebih tinggi dibandingkan pengguna lainnya. Query kedua memeriksa aktivitas yang terjadi di luar jam kerja menggunakan zona waktu Asia/Jakarta, sehingga aktivitas pada waktu yang tidak lazim dapat menjadi indikasi awal adanya akses mencurigakan. Query ketiga merangkum aktivitas berdasarkan jenis tindakan, seperti UPDATE dan DELETE, untuk membantu melihat pola perubahan data secara keseluruhan. Ketiga pemeriksaan ini digunakan sebagai sinyal awal untuk mendeteksi kemungkinan penyalahgunaan akses, bukan sebagai bukti pasti terjadinya serangan.
 
 ---
 
 ### Q28
 **Perintah:**
-```
-isi
-```
+Langkah 1
+-- Diminta: membuat tabel permintaan penghapusan data.
+-- Dipilih: DEFAULT now() + interval '72 hours'.
+-- Alternatif: GENERATED ALWAYS; tidak dipilih karena tidak didukung untuk ekspresi ini.
+
+CREATE TABLE IF NOT EXISTS lab11.permintaan_hapus (
+    id BIGSERIAL PRIMARY KEY,
+    pelanggan_id INT NOT NULL,
+    diterima_pada TIMESTAMPTZ NOT NULL DEFAULT now(),
+    tenggat TIMESTAMPTZ NOT NULL
+        DEFAULT now() + interval '72 hours',
+    status TEXT NOT NULL DEFAULT 'menunggu'
+);
+
+-- Memeriksa struktur dan isi tabel.
+SELECT *
+FROM lab11.permintaan_hapus;
+
+Langkah 2
+
+INSERT INTO lab11.permintaan_hapus (pelanggan_id)
+VALUES (12), (13);
+
+SELECT *
+FROM lab11.permintaan_hapus
+ORDER BY id;
+
 
 **Keluaran:**
-```
-isi
-```
+Langkah 1
+NOTICE:  relation "permintaan_hapus" already exists, skipping
+CREATE TABLE
+ id | pelanggan_id | diterima_pada | tenggat | status 
+----+--------------+---------------+---------+--------
+(0 rows)
+
+Langkah 2
+INSERT 0 2
+ id | pelanggan_id |         diterima_pada         |            tenggat            |  status  
+----+--------------+-------------------------------+-------------------------------+----------
+  1 |           12 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
+  2 |           13 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
+(2 rows)
 
 **Alasan Keputusan:**
-```
-isi
-```
+Keputusan membuat tabel permintaan_hapus dipilih agar setiap permintaan penghapusan data pelanggan dapat dicatat dan dipantau sebelum proses penghapusan dilakukan. Kolom diterima_pada digunakan untuk mencatat waktu permintaan diterima, sedangkan kolom tenggat menggunakan nilai default now() + interval '72 hours' agar batas waktu penyelesaian dihitung secara otomatis sejak permintaan dibuat. Saya menggunakan DEFAULT, bukan GENERATED, karena tenggat merupakan nilai yang ditentukan berdasarkan waktu ketika permintaan dimasukkan, bukan hasil perhitungan yang harus selalu mengikuti perubahan kolom lain. Kolom status juga disediakan untuk membedakan permintaan yang masih menunggu dan yang sedang diproses.
 
 ---
 
 ### Q29
 **Perintah:**
-```
-isi
-```
+Langkah 1
+-- Diminta: menghapus data pelanggan 12 dan 13.
+-- Dipilih: memeriksa data dan transaksi sebelum penghapusan.
+-- Alternatif: langsung menghapus tanpa pemeriksaan; tidak dipilih agar data uji terkontrol.
+
+SELECT id, nama, tenant_id, nik
+FROM lab11.pelanggan
+WHERE id IN (12, 13);
+
+SELECT *
+FROM lab11.transaksi
+WHERE pelanggan_id IN (12, 13);
+
+Langkah 2
+BEGIN;
+
+-- Mencatat permintaan penghapusan.
+INSERT INTO lab11.permintaan_hapus (
+    pelanggan_id,
+    status
+)
+VALUES
+    (12, 'diproses'),
+    (13, 'diproses');
+
+-- Menghapus transaksi terlebih dahulu.
+DELETE FROM lab11.transaksi
+WHERE pelanggan_id IN (12, 13);
+
+-- Menghapus data pelanggan setelah transaksi.
+DELETE FROM lab11.pelanggan
+WHERE id IN (12, 13);
+
+COMMIT;
+
+Langkah 3
+-- Memeriksa tabel utama.
+SELECT count(*) AS sisa_tabel_utama
+FROM lab11.pelanggan
+WHERE id IN (12, 13);
+
+-- Memeriksa tabel transaksi.
+SELECT count(*) AS sisa_transaksi
+FROM lab11.transaksi
+WHERE pelanggan_id IN (12, 13);
+
+-- Memeriksa tabel jejak audit.
+SELECT count(*) AS sisa_jejak_audit
+FROM lab11.jejak_audit
+WHERE kunci IN ('12', '13')
+  AND nilai_lama ? 'nik';
+
+Langkah 4
+SELECT *
+FROM lab11.permintaan_hapus
+WHERE pelanggan_id IN (12, 13)
+ORDER BY id;
 
 **Keluaran:**
-```
-isi
-```
+Langkah 1
+ id   | tenant_id | pelanggan_id |  jumlah  |         waktu          
+-------+-----------+--------------+----------+------------------------
+    10 |         1 |           12 | 10013.49 | 2025-01-14 02:00:00+00
+    11 |         1 |           13 | 10013.80 | 2025-01-15 02:00:00+00
+ 24010 |         1 |           12 | 10023.26 | 2025-01-15 02:00:00+00
+ 24011 |         1 |           13 | 10023.57 | 2025-01-16 02:00:00+00
+ 48010 |         1 |           12 | 10033.03 | 2025-01-16 02:00:00+00
+ 48011 |         1 |           13 | 10033.34 | 2025-01-17 02:00:00+00
+ 72010 |         1 |           12 | 10042.80 | 2025-01-17 02:00:00+00
+ 72011 |         1 |           13 | 10043.11 | 2025-01-18 02:00:00+00
+
+ Langkah 2
+ d IN (12, 13);anggan setelah transaksi.
+BEGIN
+INSERT 0 2
+DELETE 10
+DELETE 2
+COMMIT
+
+Langkah 3
+ sisa_tabel_utama 
+------------------
+                0
+(1 row)
+
+ sisa_transaksi 
+----------------
+              0
+(1 row)
+
+ sisa_jejak_audit 
+------------------
+                2
+(1 row)
+
+Langkah 4
+
+ id | pelanggan_id |         diterima_pada         |            tenggat            |  status  
+----+--------------+-------------------------------+-------------------------------+----------
+  1 |           12 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
+  2 |           13 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
+  3 |           12 | 2026-11-18 18:55:02.544196+00 | 2026-11-21 18:55:02.544196+00 | diproses
 
 **Alasan Keputusan:**
-```
-isi
-```
+Keputusan menghapus data transaksi terlebih dahulu sebelum menghapus data pelanggan dipilih untuk menjaga konsistensi hubungan antar-tabel dan menghindari pelanggaran foreign key. Proses penghapusan dilakukan dalam satu transaksi agar seluruh perubahan dapat berhasil bersama-sama atau dibatalkan apabila terjadi kesalahan. Sebelum penghapusan dilakukan, permintaan penghapusan dicatat agar prosesnya memiliki dokumentasi. Setelah itu, jumlah data yang tersisa pada tabel pelanggan dan transaksi diperiksa untuk memastikan data utama telah dihapus. Sementara itu, tabel audit tetap diperiksa untuk memastikan jejak aktivitas penghapusan masih tersedia, termasuk informasi lama seperti NIK yang tersimpan dalam catatan audit. Hal ini menunjukkan bahwa penghapusan data utama tidak serta-merta menghilangkan bukti aktivitas yang telah terjadi.
 
 ---
 
@@ -1332,9 +1601,7 @@ isi
 ```
 
 **Alasan Keputusan:**
-```
-isi
-```
+Keputusan memetakan setiap keluhan pada Ticket #1134 ke pasal yang relevan dalam UU Nomor 27 Tahun 2022 dan kontrol teknis dari praktikum dipilih agar setiap permasalahan memiliki dasar hukum sekaligus solusi teknis yang jelas. Pemetaan dilakukan dengan melihat inti permasalahan pada masing-masing keluhan, kemudian menghubungkannya dengan ketentuan UU PDP yang sesuai. Kontrol teknis dipilih berdasarkan mekanisme yang telah diterapkan dalam praktikum, seperti pembatasan hak akses, isolasi data antar-tenant, pencatatan audit, pengamanan data, dan prosedur penghapusan. Dengan demikian, solusi yang diberikan tidak hanya menjelaskan kewajiban dari sisi regulasi, tetapi juga menunjukkan bagaimana kewajiban tersebut dapat diterapkan melalui mekanisme database.
 
 ---
 
@@ -1378,7 +1645,24 @@ Risiko operasional: kolom terenkripsi tidak bisa dicari atau diindeks. Di Q21, d
 ---
 ### Refleksi E
 Jejak audit memuat NIK lama di nilai_lama. Jelaskan ketegangan antara kewajiban merekam pemrosesan (Pasal 31) dan kewajiban menghapus data (Pasal 43), lalu usulkan satu penyelesaian yang dapat Anda pertahankan di hadapan pemeriksa.
->> jawaban
+>> Terdapat ketegangan antara kewajiban mencatat pemrosesan
+data pribadi dalam Pasal 31 UU PDP dan kewajiban
+menghapus data pribadi dalam Pasal 43 UU PDP.
+
+Tabel jejak_audit digunakan untuk menyimpan riwayat
+aktivitas perubahan data sebagai bukti dan bahan
+pemeriksaan. Namun, tabel tersebut dapat menyimpan
+nilai lama yang masih mengandung informasi pribadi,
+seperti NIK, meskipun data pelanggan sudah dihapus
+dari tabel utama.
+
+Salah satu penyelesaian yang dapat diterapkan adalah
+melakukan penyamaran atau penghapusan informasi pribadi
+pada catatan audit setelah kebutuhan penyimpanan
+dan kewajiban retensinya berakhir. Catatan aktivitas
+yang tidak mengandung identitas pribadi tetap dapat
+dipertahankan sesuai kebutuhan audit dan ketentuan
+retensi yang berlaku.
 
 ---
 
