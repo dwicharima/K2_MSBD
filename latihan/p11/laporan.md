@@ -13,17 +13,31 @@
 ### Q1
 **Perintah:**
 ```
-isi
+$ docker exec -i lab11-db psql -U postgres -d msbd < ../latihan/p11/q01_hak_pemilik.sql
 ```
 
 **Keluaran:**
 ```
-isi
+REVOKE
+SET
+ peran_aktif 
+-------------
+ skema_owner
+(1 row)
+
+BEGIN
+ERROR:  permission denied for table pelanggan
+ROLLBACK
+GRANT
+BEGIN
+UPDATE 1
+ROLLBACK
+RESET
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Setelah REVOKE UPDATE, skema_owner ditolak (ERROR: permission denied for table pelanggan). Setelah GRANT UPDATE yang dijalankan skema_owner sendiri, UPDATE berhasil (UPDATE 1). Pemilik tabel selalu berwenang mengatur hak atas objeknya, termasuk memberikan hak apa pun kepada dirinya sendiri, sehingga REVOKE yang dijalankan terhadap pemilik hanya berlaku sampai pemilik menjalankan GRANT lagi. Kedua percobaan memakai ROLLBACK, jadi data tidak berubah.
 ```
 
 ---
@@ -31,17 +45,17 @@ isi
 ### Q2
 **Perintah:**
 ```
-isi
+$ docker exec -i lab11-db psql -U postgres -d msbd < ../latihan/p11/q02_drop_bukan_hak.sql
 ```
 
 **Keluaran:**
 ```
-isi
+ERROR:  unrecognized privilege type "drop"
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Galat yang keluar: ERROR: unrecognized privilege type "drop". Artinya DROP bukan jenis hak yang dikenal GRANT/REVOKE. Hak biasa (SELECT, INSERT, UPDATE, DELETE) adalah izin yang bisa diberikan dan dicabut per peran. Kemampuan DROP dan ALTER tidak berbentuk izin seperti itu, tetapi melekat pada status pemilik (atau anggota peran pemilik, atau superuser). Karena itu DROP tidak bisa dicabut dengan REVOKE.
 ```
 
 ---
@@ -49,17 +63,40 @@ isi
 ### Q3
 **Perintah:**
 ```
-isi
+$ docker exec -i lab11-db psql -U postgres -d msbd < ../latihan/p11/q03_default_privileges.sql
 ```
 
 **Keluaran:**
 ```
-isi
+peran_aktif 
+-------------
+ postgres
+(1 row)
+
+CREATE TABLE
+ via_postgres 
+--------------
+ f
+(1 row)
+
+DROP TABLE
+SET
+CREATE TABLE
+ via_skema_owner 
+-----------------
+ t
+(1 row)
+
+DROP TABLE
+RESET
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Tabel buatan postgres menghasilkan via_postgres = f, sedangkan tabel buatan skema_owner menghasilkan via_skema_owner = t. Penyebabnya, ALTER DEFAULT PRIVILEGES FOR ROLE skema_owner hanya berlaku untuk objek yang dibuat oleh skema_owner. Objek buatan postgres tidak terkena aturan itu, sehingga app_laporan tidak mendapat SELECT. Perintah yang seharusnya sudah dijalankan untuk peran pembuat objek tersebut:
+ALTER DEFAULT PRIVILEGES FOR ROLE postgres IN SCHEMA lab11
+GRANT SELECT ON TABLES TO app_read;
+Praktik yang lebih baik, semua objek dibuat lewat SET ROLE skema_owner agar default privileges yang sama berlaku.
 ```
 
 ---
@@ -67,17 +104,45 @@ isi
 ### Q4
 **Perintah:**
 ```
-isi
+$ docker exec -i lab11-db psql -U postgres -d msbd < ../latihan/p11/q04_grant_option.sql
 ```
 
 **Keluaran:**
 ```
-isi
+GRANT
+SET
+ peran_aktif 
+-------------
+ app_write
+(1 row)
+
+GRANT
+RESET
+ analitik | app_write 
+----------+-----------
+ t        | t
+(1 row)
+
+ERROR:  dependent privileges exist
+HINT:  Use CASCADE to revoke them too.
+REVOKE
+ analitik | app_write 
+----------+-----------
+ f        | t
+(1 row)
+
+SET
+ peran_aktif | baris_transaksi 
+-------------+-----------------
+ app_write   |          120000
+(1 row)
+
+RESET
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Sebelum dicabut, app_analitik = t dan app_write = t. REVOKE GRANT OPTION FOR SELECT ... FROM app_write tanpa CASCADE ditolak dengan ERROR: dependent privileges exist (hint: Use CASCADE to revoke them too.), karena app_analitik masih memegang hak turunan dari app_write. Dengan CASCADE, hak turunan ikut dicabut, sehingga app_analitik = f. Hak SELECT milik app_write sendiri tetap ada (app_write = t), terbukti ia masih membaca 120000 baris transaksi, karena yang dicabut hanya kemampuan meneruskan hak, bukan haknya.
 ```
 
 ---
@@ -85,17 +150,67 @@ isi
 ### Q5
 **Perintah:**
 ```
-isi
+$ docker exec -i lab11-db psql -U postgres -d msbd < ../latihan/p11/q05_tabel_peran.sql
 ```
 
 **Keluaran:**
 ```
-isi
+   rolname    | bisa_login | rolsuper | rolbypassrls 
+--------------+------------+----------+--------------
+ app_read     | f          | f        | f
+ app_write    | f          | f        | f
+ skema_owner  | f          | f        | f
+ app_analitik | t          | f        | f
+ app_auditor  | t          | f        | f
+ app_laporan  | t          | f        | f
+ app_portal   | t          | f        | f
+(7 rows)
+
+   anggota   |   induk   
+-------------+-----------
+ app_auditor | app_read
+ app_laporan | app_read
+ app_portal  | app_write
+(3 rows)
+
+    peran     | pel_sel | pel_ins | pel_upd | pel_del | akun_sel | trx_sel 
+--------------+---------+---------+---------+---------+----------+---------
+ skema_owner  | t       | t       | t       | t       | t        | t
+ app_read     | t       | f       | f       | f       | t        | t
+ app_write    | t       | t       | t       | t       | t        | t
+ app_laporan  | t       | f       | f       | f       | t        | t
+ app_portal   | t       | t       | t       | t       | t        | t
+ app_analitik | f       | f       | f       | f       | f        | f
+ app_auditor  | t       | f       | f       | f       | t        | t
+(7 rows)
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Tujuh peran, diambil dari katalog sistem (app_auditor adalah peran ketujuh pilihan kelompok, karena modul hanya menyebut enam nama):
+1. skema_owner
+Login: Tidak   
+Boleh apa: Pemilik tabel; semua hak, termasuk DROP, ALTER, dan GRANT.
+2. app_read
+Login: Tidak   
+Boleh apa: Peran fungsional: SELECT pada pelanggan, akun, dan transaksi.
+3. app_write
+Login: Tidak   
+Boleh apa: Peran fungsional: SELECT, INSERT, UPDATE, DELETE pada pelanggan; SELECT pada akun dan transaksi.
+4. app_laporan
+Login: Ya   
+Boleh apa: Anggota app_read: hanya membaca.
+5. app_laporan
+Login: Ya   
+Boleh apa: Anggota app_read: hanya membaca.
+6. app_analitik
+Login: Ya   
+Boleh apa: Belum punya hak pada tabel mana pun (semua bernilai f).  
+7. app_auditor
+Login: Ya   
+Boleh apa: Anggota app_read: hanya membaca.
+
+Tidak ada peran yang berstatus superuser atau BYPASSRLS. Aplikasi tidak pernah login sebagai pemilik karena pemilik memegang hak yang tidak bisa dicabut (DROP, ALTER, GRANT), sehingga satu bug atau serangan pada aplikasi langsung berarti kehilangan seluruh tabel.
 ```
 
 ---
