@@ -856,8 +856,12 @@ isi
 
 ### Refleksi A
 Pada Q1, hak biasa bisa dicabut dari pemilik, tetapi risikonya tetap ada. Jelaskan dari data mengapa “mencabut hak” bukan jalan keluar untuk keluhan K1, dan apa yang menjadi jalan keluarnya.
->> jawaban
----
+>> Data Q1 menunjukkan bahwa REVOKE UPDATE dari skema_owner memang membuat UPDATE ditolak (permission denied for table pelanggan). Tetapi satu GRANT UPDATE yang dijalankan skema_owner sendiri langsung mengembalikannya (UPDATE 1). Q2 memperlihatkan hal yang lebih mendasar: REVOKE DROP bahkan galat (unrecognized privilege type "drop"), karena kemampuan menghapus tabel melekat pada kepemilikan, bukan pada hak yang bisa dicabut.
+
+Karena itu mencabut hak bukan jalan keluar untuk K1. Selama aplikasi login sebagai pemilik, bug seperti DROP TABLE di modul laporan tetap dipatuhi basis data, dan setiap pencabutan bisa dibatalkan oleh pemilik itu sendiri.
+
+Jalan keluarnya memisahkan pemilik dari pemakai lewat peran berlapis. skema_owner memiliki tabel dan tidak pernah login. Hak dikumpulkan di peran fungsional (app_read, app_write) yang juga tidak login. Aplikasi login sebagai peran seperti app_laporan atau app_portal yang hanya meminjam hak dari lapis kedua. Data Q5 mendukung ini: tidak satu pun peran yang bisa login adalah pemilik, dan app_laporan hanya punya SELECT (pel_ins, pel_upd, pel_del bernilai f). Bila bug menjalankan DROP TABLE lewat peran itu, hasilnya hanya galat izin (must be owner of table), bukan tabel hilang.
+
 ### Refleksi B
 Dengan RLS aktif, apakah penyaring WHERE tenant_id di aplikasi masih perlu ditulis? Jelaskan tugas berbeda yang diemban keduanya, dengan menyebut rencana eksekusi.
 >> jawaban
@@ -900,7 +904,7 @@ sendiri di jaringan tertutup. (tanda tangan tiap anggota)
 ---
 
 ## Penggunaan AI dan Verifikasi
-
+Untuk tahap awal pengerjaan mulai dari setup kontainer Docker hingga penyusunan query pada soal Q1 sampai Q5, aku mengandalkan eksplorasi mandiri dengan mencocokkan referensi dari modul materi kuliah serta dokumentasi resmi PostgreSQL. Beberapa kendala sintaksis sempat aku selesaikan melalui proses trial and error langsung di terminal kontainer lab11. Seluruh hasil kueri juga sudah diuji coba dan dicocokkan keluarannya secara teliti sebelum dimasukkan ke dalam laporan.
 
 ---
 
