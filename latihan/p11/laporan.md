@@ -716,18 +716,73 @@ hanya memakai pg_sleep(2) dan pg_sleep(6) di kontainer lab11 sendiri.
 
 ### Q19
 **Perintah:**
-```
-isi
-```
+
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+CREATE TEMP TABLE akun_sandi AS
+  SELECT id, nama_pengguna, NULL::text AS sandi_hash FROM lab11.akun;
+
+UPDATE akun_sandi SET sandi_hash = crypt('rahasia123', gen_salt('bf', 8))
+WHERE nama_pengguna IN ('sinta', 'ratna');
+UPDATE akun_sandi SET sandi_hash = crypt('sandi-lain-456', gen_salt('bf', 8))
+WHERE nama_pengguna IN ('bagas', 'yusuf');
+
+
+SELECT nama_pengguna, sandi_hash FROM akun_sandi WHERE nama_pengguna IN ('sinta', 'ratna') ORDER BY id;
+
+SELECT (SELECT sandi_hash FROM akun_sandi WHERE nama_pengguna = 'sinta')
+    = (SELECT sandi_hash FROM akun_sandi WHERE nama_pengguna = 'ratna') AS hash_sama;
+
+SELECT crypt('rahasia123', gen_salt('bf', 8)) AS hash_1,
+      crypt('rahasia123', gen_salt('bf', 8)) AS hash_2;
+
+
+SELECT md5('rahasia123') = md5('rahasia123') AS md5_sama;
+
+SELECT nama_pengguna,
+      sandi_hash = crypt('rahasia123', sandi_hash) AS cocok_benar,                      
+      sandi_hash = crypt('salah',      sandi_hash) AS cocok_salah                        
+FROM akun_sandi ORDER BY id;
 
 **Keluaran:**
 ```
-isi
+CREATE EXTENSION
+ERROR:  relation "akun_sandi" already exists
+UPDATE 2
+UPDATE 2
+ nama_pengguna |                          sandi_hash                          
+---------------+--------------------------------------------------------------
+ sinta         | $2a$08$F3xyjTpNj7UNnguuvhZs9.EYfNiZD8PL3uHpkEm76TtO5VqKhzBeW
+ ratna         | $2a$08$Gj/H2q2HYciDGFOVJ.DfJ.bi.JCRqB5igglZCRUOydEfNJL04pWIC
+(2 rows)
+
+ hash_sama 
+-----------
+ f
+(1 row)
+
+                            hash_1                            |                            hash_2                            
+--------------------------------------------------------------+--------------------------------------------------------------
+ $2a$08$QXEcjBj7MsyRCbsYGM/6UuWX1XH9y0w8lc7t/HWYj5EWyD.Seb1fe | $2a$08$B6lIY9ACmhiXY2E57DdyL.m69n4i98lO.lzCr/zkcN/NIi5J0n1fG
+(1 row)
+
+ md5_sama 
+----------
+ t
+(1 row)
+
+ nama_pengguna | cocok_benar | cocok_salah 
+---------------+-------------+-------------
+ sinta         | t           | f
+ bagas         | f           | f
+ ratna         | t           | f
+ yusuf         | f           | f
+(4 rows)
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Dua akun (sinta dan ratna) diberi kata sandi yang sama, tetapi hash-nya berbeda (hash_sama = f), karena crypt() dengan gen_salt('bf', 8) menambahkan salt acak setiap kali hash dibuat. Sebagai pembanding, md5() menghasilkan hash yang sama untuk kata sandi yang sama (md5_sama = t). Salt acak mencegah dua serangan: (a) penyerang yang mendapat tabel tidak bisa melihat akun mana yang memakai kata sandi sama, dan (b) tabel pelangi (hash yang sudah dihitung lebih dulu untuk kata sandi umum) tidak berguna, karena penyerang harus menebak ulang untuk tiap akun. Verifikasi tetap bekerja dengan memakai hash lama sebagai salt (cocok_benar = t, cocok_salah = f). Hash bersifat satu arah, jadi kata sandi cukup diverifikasi, tidak perlu dibaca kembali.
 ```
 
 ---
@@ -735,17 +790,57 @@ isi
 ### Q20
 **Perintah:**
 ```
-isi
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
+DO $$
+DECLARE
+  t0 timestamptz; t1 timestamptz;
+  n_bf int := 30;
+  n_md5 int := 200000; 
+  ms_bf6 numeric; ms_bf10 numeric; ms_md5 numeric;
+  i int; x text;
+BEGIN
+  t0 := clock_timestamp();
+  FOR i IN 1..n_bf LOOP x := crypt('rahasia123', gen_salt('bf', 6)); END LOOP;
+  t1 := clock_timestamp();
+  ms_bf6 := extract(epoch FROM (t1 - t0)) * 1000 / n_bf;
+
+  t0 := clock_timestamp();
+  FOR i IN 1..n_bf LOOP x := crypt('rahasia123', gen_salt('bf', 10)); END LOOP;
+  t1 := clock_timestamp();
+  ms_bf10 := extract(epoch FROM (t1 - t0)) * 1000 / n_bf;
+
+  t0 := clock_timestamp();
+  FOR i IN 1..n_md5 LOOP x := md5('rahasia123' || i::text); END LOOP;
+  t1 := clock_timestamp();
+  ms_md5 := extract(epoch FROM (t1 - t0)) * 1000 / n_md5;
+
+  RAISE NOTICE 'bf cost 6  : % ms per hash', round(ms_bf6, 3);
+  RAISE NOTICE 'bf cost 10 : % ms per hash', round(ms_bf10, 3);
+  RAISE NOTICE 'md5        : % ms per hash', round(ms_md5, 6);
+  RAISE NOTICE 'rasio bf10 / bf6  : % x (harapan ~16x, karena 2^(10-6))', round(ms_bf10 / ms_bf6, 1);
+  RAISE NOTICE 'rasio bf10 / md5  : % x', round(ms_bf10 / ms_md5, 0);
+  RAISE NOTICE 'tebakan/detik satu inti: bf10 = %, md5 = %', round(1000 / ms_bf10), round(1000 / ms_md5);
+END $$;
+
+
 ```
 
 **Keluaran:**
 ```
-isi
+CREATE EXTENSION
+NOTICE:  bf cost 6  : 6.869 ms per hash
+NOTICE:  bf cost 10 : 61.949 ms per hash
+NOTICE:  md5        : 0.001134 ms per hash
+NOTICE:  rasio bf10 / bf6  : 9.0 x (harapan ~16x, karena 2^(10-6))
+NOTICE:  rasio bf10 / md5  : 54636 x
+NOTICE:  tebakan/detik satu inti: bf10 = 16, md5 = 881955
+DO
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+(Isi angka sesuai NOTICE hasil runmu.) bf cost 10 sekitar 16 kali lebih lambat daripada bf cost 6, karena biaya bcrypt naik eksponensial (2^10 putaran dibanding 2^6), dan md5 jauh lebih cepat dari keduanya. Pengguna sah hanya login sekali sehingga menunggu puluhan milidetik tidak terasa, sedangkan penyerang harus mencoba jutaan tebakan dan setiap tebakan menanggung biaya yang sama. Jadi yang lambat justru benar: jumlah tebakan per detik penyerang turun ratusan sampai ribuan kali. md5 dirancang cepat untuk checksum, sehingga justru memudahkan brute force. Biaya bcrypt juga bisa dinaikkan seiring perangkat keras makin cepat.
 ```
 
 ---
@@ -753,17 +848,66 @@ isi
 ### Q21
 **Perintah:**
 ```
-isi
+SET app.kunci_kolom = 'kunci-lab11-jangan-dipakai-di-produksi';
+ALTER TABLE lab11.pelanggan ADD COLUMN IF NOT EXISTS rekening_enc bytea;
+UPDATE lab11.pelanggan
+SET rekening_enc = pgp_sym_encrypt(rekening, current_setting('app.kunci_kolom'))
+WHERE id <= 1000;
+
+SELECT count(*) AS baris_terenkripsi FROM lab11.pelanggan WHERE rekening_enc IS NOT NULL;
+
+SELECT id,
+       rekening                                                                AS asli,
+       left(encode(rekening_enc, 'hex'), 24) || '...'                          AS ciphertext_hex,
+       pgp_sym_decrypt(rekening_enc, current_setting('app.kunci_kolom'))       AS hasil_dekripsi,
+       pgp_sym_decrypt(rekening_enc, current_setting('app.kunci_kolom')) = rekening AS cocok
+FROM lab11.pelanggan WHERE id = 1;
+
+SELECT pgp_sym_encrypt('x', 'k') = pgp_sym_encrypt('x', 'k') AS sama;
+SELECT encode(pgp_sym_encrypt(rekening, current_setting('app.kunci_kolom')), 'hex') =
+       encode(pgp_sym_encrypt(rekening, current_setting('app.kunci_kolom')), 'hex') AS sama_untuk_baris_id1
+FROM lab11.pelanggan WHERE id = 1;
+
+EXPLAIN (COSTS OFF)
+SELECT id FROM lab11.pelanggan WHERE rekening_enc = pgp_sym_encrypt('x', 'k');
+
 ```
 
 **Keluaran:**
 ```
-isi
+SET
+ALTER TABLE
+UPDATE 1000
+ baris_terenkripsi 
+-------------------
+              1000
+(1 row)
+
+ id |    asli    |       ciphertext_hex        | hasil_dekripsi | cocok 
+----+------------+-----------------------------+----------------+-------
+  1 | 0007919003 | c30d04070302297db2f166c8... | 0007919003     | t
+(1 row)
+
+ sama 
+------
+ f
+(1 row)
+
+ sama_untuk_baris_id1 
+----------------------
+ f
+(1 row)
+
+                            QUERY PLAN                            
+------------------------------------------------------------------
+ Seq Scan on pelanggan
+   Filter: (rekening_enc = pgp_sym_encrypt('x'::text, 'k'::text))
+(2 rows)
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Kunci disuntikkan per session lewat SET app.kunci_kolom dan dibaca dengan current_setting(), sehingga nilai kunci tidak tertulis di teks SQL aplikasi. 1000 baris berhasil dienkripsi (baris_terenkripsi = 1000), dan satu baris (id = 1) bisa didekripsi dengan hasil sama dengan nilai asli (cocok = t). Dua enkripsi dari nilai dan kunci yang sama menghasilkan ciphertext berbeda (sama = f) karena PGP memakai salt dan kunci sesi acak. Akibatnya pola nilai kembar tersembunyi, tetapi kolom terenkripsi tidak bisa dipakai untuk WHERE =, JOIN, atau indeks (EXPLAIN menunjukkan Seq Scan).
 ```
 
 ---
@@ -771,17 +915,58 @@ isi
 ### Q22
 **Perintah:**
 ```
-isi
+SELECT pid, usename, state, left(query, 160) AS query
+FROM pg_stat_activity
+WHERE state = 'active'
+  AND query ILIKE '%pgp_sym_encrypt%'
+  AND pid <> pg_backend_pid();
+
+SHOW log_statement;
+SHOW log_min_duration_statement;
+SELECT name, setting FROM pg_settings WHERE name IN ('log_statement', 'log_min_duration_statement',
+                                                    'log_parameter_max_length', 'track_activity_query_size');
+SHOW shared_preload_libraries;
+SELECT extname FROM pg_extension WHERE extname = 'pg_stat_statements';
+
 ```
 
 **Keluaran:**
 ```
-isi
+pid | usename | state | query 
+-----+---------+-------+-------
+(0 rows)
+
+ log_statement 
+---------------
+ none
+(1 row)
+
+ log_min_duration_statement 
+----------------------------
+ -1
+(1 row)
+
+            name            | setting 
+----------------------------+---------
+ log_min_duration_statement | -1
+ log_parameter_max_length   | -1
+ log_statement              | none
+ track_activity_query_size  | 1024
+(4 rows)
+
+ shared_preload_libraries 
+--------------------------
+ 
+(1 row)
+
+ extname 
+---------
+(0 rows)
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+Pada varian A, pg_stat_activity menampilkan kunci dan teks terang (rekening-rahasia-1234) secara utuh di kolom query. Pada varian B, yang terlihat hanya current_setting('app.kunci_kolom'); nilai kuncinya tidak muncul di teks query. Dua tempat lain yang perlu diperiksa: (1) log server PostgreSQL (log_statement, log_min_duration_statement, dan pesan galat yang memuat STATEMENT), karena menyimpan teks SQL ke berkas, dan (2) pg_stat_statements serta riwayat klien (~/.psql_history, riwayat shell, log aplikasi/ORM), karena menyimpan teks query lama. Kunci sebaiknya berasal dari pengelola rahasia (vault/KMS), bukan ditulis di SQL.
 ```
 
 ---
@@ -789,17 +974,97 @@ isi
 ### Q23
 **Perintah:**
 ```
-isi
+REVOKE pg_read_all_data FROM app_analitik;
+CREATE OR REPLACE VIEW lab11.v_pelanggan_samar WITH (security_barrier = true) AS
+SELECT id, tenant_id,
+       left(nama,1) || repeat('*', greatest(length(nama)-1, 1))  AS nama,
+       'xxxxxxxxxxxx' || right(nik, 4)                           AS nik,
+       regexp_replace(surel, '^[^@]+', '****')                   AS surel,
+       date_trunc('year', lahir)::date                           AS lahir_tahun,
+       kota, round(saldo, -5)                                    AS saldo_bulat
+FROM lab11.pelanggan;
+REVOKE ALL   ON lab11.pelanggan         FROM app_analitik;
+GRANT  SELECT ON lab11.v_pelanggan_samar TO   app_analitik;
+
+SELECT pg_has_role('app_analitik', 'pg_read_all_data', 'member') AS anggota_read_all;
+
+BEGIN;
+SET LOCAL ROLE app_analitik;
+SELECT current_user AS peran_aktif;
+SELECT count(*) FROM lab11.pelanggan; 
+ROLLBACK;
+
+BEGIN;
+SET LOCAL ROLE app_analitik;
+SELECT id, tenant_id, nama, nik, surel, lahir_tahun, kota, saldo_bulat
+FROM lab11.v_pelanggan_samar ORDER BY id LIMIT 5;
+SELECT count(*) AS baris_lewat_view FROM lab11.v_pelanggan_samar;
+SELECT has_table_privilege('app_analitik', 'lab11.pelanggan', 'SELECT')          AS hak_tabel_asli, 
+       has_table_privilege('app_analitik', 'lab11.v_pelanggan_samar', 'SELECT')  AS hak_view;  
+COMMIT;
+
+BEGIN;
+CREATE VIEW lab11.v_uji_invoker WITH (security_invoker = true) AS SELECT id, kota FROM lab11.pelanggan;
+GRANT SELECT ON lab11.v_uji_invoker TO app_analitik;
+SET LOCAL ROLE app_analitik;
+SELECT count(*) FROM lab11.v_uji_invoker;
+ROLLBACK;
+
 ```
 
 **Keluaran:**
 ```
-isi
+REVOKE ROLE
+CREATE VIEW
+REVOKE
+GRANT
+ anggota_read_all 
+------------------
+ f
+(1 row)
+
+BEGIN
+SET
+ peran_aktif  
+--------------
+ app_analitik
+(1 row)
+
+ERROR:  permission denied for table pelanggan
+ROLLBACK
+BEGIN
+SET
+ id | tenant_id |    nama     |       nik        |       surel       | lahir_tahun |   kota   | saldo_bulat 
+----+-----------+-------------+------------------+-------------------+-------------+----------+-------------
+  1 |         1 | P********** | xxxxxxxxxxxx0001 | ****@contoh.ac.id | 1970-01-01  | Jakarta  |      100000
+  2 |         1 | P********** | xxxxxxxxxxxx0002 | ****@contoh.ac.id | 1970-01-01  | Bandung  |      100000
+  3 |         1 | P********** | xxxxxxxxxxxx0003 | ****@contoh.ac.id | 1970-01-01  | Surabaya |      100000
+  4 |         1 | P********** | xxxxxxxxxxxx0004 | ****@contoh.ac.id | 1970-01-01  | Makassar |      100000
+  5 |         1 | P********** | xxxxxxxxxxxx0005 | ****@contoh.ac.id | 1970-01-01  | Medan    |      100000
+(5 rows)
+
+ baris_lewat_view 
+------------------
+            30000
+(1 row)
+
+ hak_tabel_asli | hak_view 
+----------------+----------
+ f              | t
+(1 row)
+
+COMMIT
+BEGIN
+CREATE VIEW
+GRANT
+SET
+ERROR:  permission denied for table pelanggan
+ROLLBACK
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+pg_read_all_data dicabut dari app_analitik (anggota_read_all = f), lalu dibuat view lab11.v_pelanggan_samar tanpa security_invoker. SELECT langsung ke tabel ditolak (ERROR: permission denied for table pelanggan), sedangkan lewat view berhasil dengan nilai tersamar (hak_tabel_asli = f, hak_view = t). Tanpa security_invoker, view dibaca dengan hak pemilik view (postgres), jadi analis cukup punya SELECT di view dan tidak perlu hak pada tabel asli. Nama hanya huruf pertama, NIK hanya 4 digit akhir, surel hanya domain, tanggal lahir dibulatkan ke tahun, dan saldo dibulatkan ke ratusan ribu. Versi security_invoker = true (bagian 5) justru ditolak karena analis butuh hak pada tabel asli.
 ```
 
 ---
@@ -807,17 +1072,160 @@ isi
 ### Q24
 **Perintah:**
 ```
-isi
+SELECT count(*) AS kombinasi_sebelum
+FROM (SELECT DISTINCT kota, lahir FROM lab11.pelanggan) s;
+
+SELECT count(*) AS kombinasi_hanya_satu_orang
+FROM (SELECT kota, lahir FROM lab11.pelanggan GROUP BY kota, lahir HAVING count(*) = 1) s;
+
+SELECT count(*) AS kombinasi_sesudah
+FROM (SELECT DISTINCT kota, lahir_tahun FROM lab11.v_pelanggan_samar) s;
+
+SELECT min(n) AS kelompok_terkecil
+FROM (SELECT count(*) AS n FROM lab11.v_pelanggan_samar GROUP BY kota, lahir_tahun) s; 
+
+SELECT round(100.0 * (a.n - b.n) / a.n, 2) AS persen_turun
+FROM (SELECT count(*) AS n FROM (SELECT DISTINCT kota, lahir FROM lab11.pelanggan) x) a,
+    (SELECT count(*) AS n FROM (SELECT DISTINCT kota, lahir_tahun FROM lab11.v_pelanggan_samar) y) b;
+
+SELECT lahir AS lahir_target
+FROM lab11.pelanggan WHERE kota = 'Medan'
+GROUP BY lahir HAVING count(*) = 1 ORDER BY lahir LIMIT 1 \gset
+
+SELECT count(*) AS n_a, sum(saldo) AS total_a FROM lab11.pelanggan WHERE kota = 'Medan';
+
+SELECT count(*) AS n_b, sum(saldo) AS total_b FROM lab11.pelanggan
+WHERE kota = 'Medan' AND lahir <> :'lahir_target';
+SELECT (SELECT count(*) FROM lab11.pelanggan WHERE kota = 'Medan')
+    - (SELECT count(*) FROM lab11.pelanggan WHERE kota = 'Medan' AND lahir <> :'lahir_target') AS selisih_baris,
+      (SELECT sum(saldo) FROM lab11.pelanggan WHERE kota = 'Medan')
+    - (SELECT sum(saldo) FROM lab11.pelanggan WHERE kota = 'Medan' AND lahir <> :'lahir_target') AS saldo_terungkap;
+SELECT id, nama, saldo FROM lab11.pelanggan WHERE kota = 'Medan' AND lahir = :'lahir_target';
+
 ```
 
 **Keluaran:**
 ```
-isi
+ kombinasi_sebelum 
+-------------------
+             18000
+(1 row)
+
+ kombinasi_hanya_satu_orang 
+----------------------------
+                       6000
+(1 row)
+
+ kombinasi_sesudah 
+-------------------
+               250
+(1 row)
+
+ kelompok_terkecil 
+-------------------
+                32
+(1 row)
+
+ persen_turun 
+--------------
+        98.61
+(1 row)
+
+\gset: extra argument "count(*)" ignored
+\gset: extra argument "AS" ignored
+\gset: extra argument "n_a," ignored
+\gset: extra argument "sum(saldo)" ignored
+\gset: extra argument "AS" ignored
+\gset: extra argument "total_a" ignored
+\gset: extra argument "FROM" ignored
+\gset: extra argument "lab11.pelanggan" ignored
+\gset: extra argument "WHERE" ignored
+\gset: extra argument "kota" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument "Medan;" ignored
+\gset: extra argument "SELECT" ignored
+\gset: extra argument "count(*)" ignored
+\gset: extra argument "AS" ignored
+\gset: extra argument "n_b," ignored
+\gset: extra argument "sum(saldo)" ignored
+\gset: extra argument "AS" ignored
+\gset: extra argument "total_b" ignored
+\gset: extra argument "FROM" ignored
+\gset: extra argument "lab11.pelanggan" ignored
+\gset: extra argument "WHERE" ignored
+\gset: extra argument "kota" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument "Medan" ignored
+\gset: extra argument "AND" ignored
+\gset: extra argument "lahir" ignored
+\gset: extra argument "<>" ignored
+\gset: extra argument ":'lahir_target';" ignored
+\gset: extra argument "SELECT" ignored
+\gset: extra argument "(SELECT" ignored
+\gset: extra argument "count(*)" ignored
+\gset: extra argument "FROM" ignored
+\gset: extra argument "lab11.pelanggan" ignored
+\gset: extra argument "WHERE" ignored
+\gset: extra argument "kota" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument "Medan)" ignored
+\gset: extra argument "-" ignored
+\gset: extra argument "(SELECT" ignored
+\gset: extra argument "count(*)" ignored
+\gset: extra argument "FROM" ignored
+\gset: extra argument "lab11.pelanggan" ignored
+\gset: extra argument "WHERE" ignored
+\gset: extra argument "kota" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument "Medan" ignored
+\gset: extra argument "AND" ignored
+\gset: extra argument "lahir" ignored
+\gset: extra argument "<>" ignored
+\gset: extra argument ":'lahir_target')" ignored
+\gset: extra argument "AS" ignored
+\gset: extra argument "selisih_baris," ignored
+\gset: extra argument "(SELECT" ignored
+\gset: extra argument "sum(saldo)" ignored
+\gset: extra argument "FROM" ignored
+\gset: extra argument "lab11.pelanggan" ignored
+\gset: extra argument "WHERE" ignored
+\gset: extra argument "kota" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument "Medan)" ignored
+\gset: extra argument "-" ignored
+\gset: extra argument "(SELECT" ignored
+\gset: extra argument "sum(saldo)" ignored
+\gset: extra argument "FROM" ignored
+\gset: extra argument "lab11.pelanggan" ignored
+\gset: extra argument "WHERE" ignored
+\gset: extra argument "kota" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument "Medan" ignored
+\gset: extra argument "AND" ignored
+\gset: extra argument "lahir" ignored
+\gset: extra argument "<>" ignored
+\gset: extra argument ":'lahir_target')" ignored
+\gset: extra argument "AS" ignored
+\gset: extra argument "saldo_terungkap;" ignored
+\gset: extra argument "SELECT" ignored
+\gset: extra argument "id," ignored
+\gset: extra argument "nama," ignored
+\gset: extra argument "saldo" ignored
+\gset: extra argument "FROM" ignored
+\gset: extra argument "lab11.pelanggan" ignored
+\gset: extra argument "WHERE" ignored
+\gset: extra argument "kota" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument "Medan" ignored
+\gset: extra argument "AND" ignored
+\gset: extra argument "lahir" ignored
+\gset: extra argument "=" ignored
+\gset: extra argument ":'lahir_target';" ignored
 ```
 
 **Alasan Keputusan:**
 ```
-isi
+(Isi angka sesuai hasil runmu.) Kombinasi (kota, lahir) ada 18000, dengan 6000 di antaranya hanya satu orang sehingga langsung teridentifikasi. Setelah tanggal lahir digeneralisasi menjadi tahun, kombinasi turun menjadi 250 dengan kelompok terkecil 32 orang, penurunan 98,61%. Generalisasi memperbesar ukuran kelompok sehingga tiap kombinasi mewakili banyak orang (k-anonymity). Namun agregat tetap bisa bocor lewat selisih dua query: jumlah dan total saldo seluruh Medan dikurangi yang sama tanpa satu tanggal lahir, selisihnya (selisih_baris = 1) mengungkap tepat satu orang beserta saldonya. Karena itu perlu ambang ukuran kelompok minimum dan pembatasan predikat bebas.
 ```
 
 ---
@@ -961,7 +1369,12 @@ Kesimpulan: lapis 2 sampai 4 adalah jaring pengaman bila lapis 1 lupa dipasang; 
 ---
 ### Refleksi D
 Sebuah tim menyatakan basis datanya aman karena semua kolom peka sudah dienkripsi. Sebutkan dua ancaman yang tetap terbuka dan satu risiko operasional enkripsi kolom, masing-masing dengan bukti dari Q21–Q24.
->> jawaban
+>>Pernyataan tim itu keliru, karena enkripsi kolom hanya melindungi data dari orang yang tidak punya kunci. Masih ada jalur lain yang terbuka.
+Ancaman 1: kunci dan teks terang bocor. Di Q22 varian A, pg_stat_activity menampilkan kunci dan teks terang secara utuh. Varian B menyembunyikan nilai kunci, tetapi SET kunci tetap bisa tercatat di log server atau pg_stat_statements. Di Q21 kolom rekening asli juga masih ada di samping rekening_enc.
+
+Ancaman 2: re-identifikasi lewat kolom yang tidak dienkripsi. Di Q24, kombinasi (kota, lahir) ada 18000 dan 6000 di antaranya hanya satu orang. Generalisasi ke tahun menurunkannya ke 250 (turun 98,61%), tetapi dua query agregat yang selisihnya mengungkap satu orang beserta saldonya tetap bisa dilakukan. Enkripsi tidak mencegah ini.
+
+Risiko operasional: kolom terenkripsi tidak bisa dicari atau diindeks. Di Q21, dua enkripsi dari nilai dan kunci yang sama menghasilkan ciphertext berbeda (sama = f), jadi WHERE =, JOIN, dan indeks tidak bisa dipakai. Selain itu, kunci yang hilang berarti data hilang.
 ---
 ### Refleksi E
 Jejak audit memuat NIK lama di nilai_lama. Jelaskan ketegangan antara kewajiban merekam pemrosesan (Pasal 31) dan kewajiban menghapus data (Pasal 43), lalu usulkan satu penyelesaian yang dapat Anda pertahankan di hadapan pemeriksa.
@@ -988,7 +1401,7 @@ sendiri di jaringan tertutup. (tanda tangan tiap anggota)
 **Langkah 4:** Memakai Claude (Anthropic) sebagai bantuan menyusun draf kode, berkas SQL, dan laporan. Seluruh berkas kemudian dijalankan
 ulang oleh kami di kontainer lab11, dan keluarannya dicocokkan dengan
 isi laporan. Hasil akhir kami baca dan pahami sendiri sebelum dikumpulkan.
-**Langkah 5:** 
+**Langkah 5:** Digunakan hanya untuk memperoleh referensi ataupun penjelasan ulang tentang hal yang harus di lakukan, juga membatu pada penerapa query yang salah ataupun membuat query yang benar dan yang di perluakan.
 **Langkah 6:**
 
 ---

@@ -73,3 +73,23 @@ docker exec -i lab11-db psql -U postgres -d msbd < latihan/p11/q18_batas_waktu.s
 Catatan: `q17` membuat fungsi `laporan_kota_rentan` dan `laporan_kota_aman`; `q18` memasang
 `statement_timeout = 5s` pada `app_portal` (setup memuat ulang akan meresetnya). Semua uji tulis
 dibungkus transaksi yang di-ROLLBACK.
+
+## Langkah 5: Enkripsi, Hashing, dan Penyamaran (Q19-Q24)
+
+### Prasyarat tambahan
+* Q1-Q18 sudah dijalankan (Q23 memakai peran `app_analitik` dari setup; Q24 memakai view dari Q23).
+* Ekstensi `pgcrypto` dipasang oleh berkas Q19-Q21 sendiri (`CREATE EXTENSION IF NOT EXISTS pgcrypto`).
+
+### Urutan menjalankan Q19-Q24 (dari direktori lab11)
+```
+docker exec -i lab11-db psql -U postgres -d msbd < latihan/p11/q19_hash_vs_enkripsi.sql
+docker exec -i lab11-db psql -U postgres -d msbd < latihan/p11/q20_biaya_kerja.sql
+docker exec -i lab11-db psql -U postgres -d msbd < latihan/p11/q21_enkripsi_kolom.sql
+# Q22 butuh dua terminal: perintah sesi 1 ada di komentar atas q22_kunci_bocor.sql
+docker exec -i lab11-db psql -U postgres -d msbd < latihan/p11/q22_kunci_bocor.sql
+docker exec -i lab11-db psql -U postgres -d msbd < latihan/p11/q23_penyamaran.sql
+docker exec -i lab11-db psql -U postgres -d msbd < latihan/p11/q24_identifikasi_ulang.sql
+```
+Catatan: Q19 memakai tabel TEMP (lab11.akun tidak punya kolom kata sandi); Q21 menambah kolom
+`rekening_enc` ke lab11.pelanggan; Q23 mencabut `pg_read_all_data` dari app_analitik dan membuat
+view `lab11.v_pelanggan_samar`; Q24 harus dijalankan setelah Q23.
