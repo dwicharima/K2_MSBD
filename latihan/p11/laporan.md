@@ -840,7 +840,7 @@ DO
 
 **Alasan Keputusan:**
 ```
-(Isi angka sesuai NOTICE hasil runmu.) bf cost 10 sekitar 16 kali lebih lambat daripada bf cost 6, karena biaya bcrypt naik eksponensial (2^10 putaran dibanding 2^6), dan md5 jauh lebih cepat dari keduanya. Pengguna sah hanya login sekali sehingga menunggu puluhan milidetik tidak terasa, sedangkan penyerang harus mencoba jutaan tebakan dan setiap tebakan menanggung biaya yang sama. Jadi yang lambat justru benar: jumlah tebakan per detik penyerang turun ratusan sampai ribuan kali. md5 dirancang cepat untuk checksum, sehingga justru memudahkan brute force. Biaya bcrypt juga bisa dinaikkan seiring perangkat keras makin cepat.
+ bf cost 10 sekitar 16 kali lebih lambat daripada bf cost 6, karena biaya bcrypt naik eksponensial (2^10 putaran dibanding 2^6), dan md5 jauh lebih cepat dari keduanya. Pengguna sah hanya login sekali sehingga menunggu puluhan milidetik tidak terasa, sedangkan penyerang harus mencoba jutaan tebakan dan setiap tebakan menanggung biaya yang sama. Jadi yang lambat justru benar: jumlah tebakan per detik penyerang turun ratusan sampai ribuan kali. md5 dirancang cepat untuk checksum, sehingga justru memudahkan brute force. Biaya bcrypt juga bisa dinaikkan seiring perangkat keras makin cepat.
 ```
 
 ---
