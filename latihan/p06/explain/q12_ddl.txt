@@ -1,0 +1,14 @@
+CREATE INDEX
+CREATE INDEX
+ANALYZE
+INSERT 0 2
+ bytes_polos | bytes_parsial | polos | parsial | hemat_persen 
+-------------+---------------+-------+---------+--------------
+    44949504 |        917504 | 43 MB | 896 kB  |        97.96
+(1 row)
+
+ baris_gagal | persen_baris 
+-------------+--------------
+       40000 |         2.00
+(1 row)
+

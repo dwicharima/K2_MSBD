@@ -1,0 +1,11 @@
+    index     | ukuran |  bytes   | byte_per_entri | halaman_8kb 
+--------------+--------+----------+----------------+-------------
+ ev_benar_idx | 60 MB  | 63102976 |          31.55 |        7703
+ ev_salah_idx | 60 MB  | 63012864 |          31.51 |        7692
+(2 rows)
+
+ selisih_persen 
+----------------
+           0.14
+(1 row)
+

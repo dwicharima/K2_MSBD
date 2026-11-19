@@ -1,0 +1,10 @@
+DROP INDEX
+CREATE INDEX
+ANALYZE
+INSERT 0 1
+    index     | ukuran |  bytes   
+--------------+--------+----------
+ ev_cover_idx | 77 MB  | 81133568
+ ev_tiga_idx  | 77 MB  | 81133568
+(2 rows)
+

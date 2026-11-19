@@ -1,0 +1,39 @@
+--FOR UPDATE
+BEGIN;
+
+SELECT *
+FROM lab9.rekening
+WHERE rekening_id = 1
+FOR UPDATE;
+
+ROLLBACK;
+
+--FOR NO KEY UPDATE
+BEGIN;
+
+SELECT *
+FROM lab9.rekening
+WHERE rekening_id = 1
+FOR NO KEY UPDATE;
+
+ROLLBACK;
+
+--FOR SHARE
+BEGIN;
+
+SELECT *
+FROM lab9.rekening
+WHERE rekening_id = 1
+FOR SHARE;
+
+ROLLBACK;
+
+--FOR KEY SHARE
+BEGIN;
+
+SELECT *
+FROM lab9.rekening
+WHERE rekening_id = 1
+FOR KEY SHARE;
+
+ROLLBACK;

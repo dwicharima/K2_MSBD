@@ -1,0 +1,29 @@
+networks:
+  labnet:
+    internal: true
+
+services:
+  db:
+    image: postgres:17
+    container_name: lab11-db
+    environment:
+      POSTGRES_DB: msbd
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: secretpassword
+    networks:
+      - labnet
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  web:
+    image: python:3.10-slim
+    container_name: lab11-web
+    working_dir: /app
+    volumes:
+      - ./app:/app
+    networks:
+      - labnet
+    command: tail -f /dev/null
+
+volumes:
+  pgdata:

@@ -1,0 +1,39 @@
+===== RUN 1 =====
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using ev_tiga_idx on event_log  (cost=0.43..9.02 rows=34 width=18) (actual time=0.027..0.029 rows=20 loops=1)
+   Index Cond: (customer_id = 4211)
+   Heap Fetches: 0
+   Buffers: shared hit=3 read=3
+ Planning:
+   Buffers: shared hit=150 read=1
+ Planning Time: 0.373 ms
+ Execution Time: 0.068 ms
+(8 rows)
+
+===== RUN 2 =====
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using ev_tiga_idx on event_log  (cost=0.43..9.02 rows=34 width=18) (actual time=0.015..0.017 rows=20 loops=1)
+   Index Cond: (customer_id = 4211)
+   Heap Fetches: 0
+   Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=151
+ Planning Time: 0.273 ms
+ Execution Time: 0.056 ms
+(8 rows)
+
+===== RUN 3 =====
+                                                          QUERY PLAN                                                           
+-------------------------------------------------------------------------------------------------------------------------------
+ Index Only Scan using ev_tiga_idx on event_log  (cost=0.43..9.02 rows=34 width=18) (actual time=0.018..0.020 rows=20 loops=1)
+   Index Cond: (customer_id = 4211)
+   Heap Fetches: 0
+   Buffers: shared hit=6
+ Planning:
+   Buffers: shared hit=151
+ Planning Time: 0.303 ms
+ Execution Time: 0.075 ms
+(8 rows)
+

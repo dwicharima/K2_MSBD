@@ -1,0 +1,9 @@
+CREATE TABLE
+CREATE INDEX
+ANALYZE
+INSERT 0 1
+    index     | ukuran |  bytes   
+--------------+--------+----------
+ ev_salah_idx | 60 MB  | 63012864
+(1 row)
+
