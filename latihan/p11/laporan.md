@@ -716,7 +716,7 @@ hanya memakai pg_sleep(2) dan pg_sleep(6) di kontainer lab11 sendiri.
 
 ### Q19
 **Perintah:**
-
+```
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TEMP TABLE akun_sandi AS
@@ -743,6 +743,7 @@ SELECT nama_pengguna,
       sandi_hash = crypt('rahasia123', sandi_hash) AS cocok_benar,                      
       sandi_hash = crypt('salah',      sandi_hash) AS cocok_salah                        
 FROM akun_sandi ORDER BY id;
+```
 
 **Keluaran:**
 ```
@@ -1232,9 +1233,12 @@ SELECT id, nama, saldo FROM lab11.pelanggan WHERE kota = 'Medan' AND lahir = :'l
 
 ### Q25
 **Perintah:**
+```
 (.venv) PS C:\Users\Fakhry Adrian\OneDrive\Documents\Tubes_MSBD\K2_MSBD> Get-Content .\latihan\p11\q25_tabel_audit.sql -Raw | docker exec -i lab11-db psql -U postgres -d msbd
+```
 
 **Keluaran:**
+```
 CREATE TABLE
 CREATE FUNCTION
 DROP TRIGGER
@@ -1248,14 +1252,18 @@ REVOKE
  trg_rekam_audit | DELETE             | pelanggan
  trg_rekam_audit | UPDATE             | pelanggan
 (2 rows)
+```
 
 **Alasan Keputusan:**
+```
 Keputusan menggunakan tabel jejak_audit dan trigger rekam_audit dipilih agar setiap aktivitas UPDATE dan DELETE pada tabel pelanggan dapat tercatat secara otomatis. Trigger digunakan karena pencatatan audit dilakukan langsung oleh database setiap kali terjadi perubahan data, sehingga aplikasi tidak perlu melakukan INSERT audit secara manual. Saya menggunakan SECURITY DEFINER agar fungsi trigger dapat menulis ke tabel audit meskipun pengguna aplikasi tidak memiliki hak akses langsung ke tabel tersebut. Selain itu, penggunaan session_user dipilih agar identitas pengguna yang benar-benar melakukan koneksi tetap tercatat, bukan identitas pemilik fungsi trigger. Hak akses langsung terhadap tabel audit dicabut dari role aplikasi untuk mencegah manipulasi maupun pemalsuan catatan audit.
+```
 
 ---
 
 ### Q26
 **Perintah:**
+```
 Langkah 1
 msbd=# SELECT id, nama, tenant_id
 FROM lab11.pelanggan
@@ -1314,8 +1322,10 @@ VALUES (
 );
 
 RESET ROLE;
+```
 
 **Keluaran:**
+```
 Langkah 1
  id |    nama     | tenant_id 
 ----+-------------+-----------
@@ -1351,14 +1361,18 @@ SET
 ERROR:  permission denied for table jejak_audit
 ERROR:  permission denied for table jejak_audit
 RESET
+```
 
 **Alasan Keputusan:**
+```
 Keputusan melakukan UPDATE dan DELETE terhadap data pelanggan milik tenant 1 dipilih untuk membuktikan bahwa trigger audit bekerja pada aktivitas perubahan data yang dilakukan oleh pengguna aplikasi. Pengujian menggunakan akun app_portal bertujuan memastikan bahwa aktivitas pengguna biasa tetap dapat dicatat tanpa memberikan hak akses langsung untuk menulis ke tabel audit. Saya juga menguji akses SELECT dan INSERT secara langsung terhadap tabel audit untuk membuktikan bahwa role aplikasi tidak dapat membaca maupun memalsukan catatan audit. Pengujian dilakukan menggunakan data milik tenant sendiri agar tidak melanggar batas isolasi antar-tenant.
+```
 
 ---
 
 ### Q27
 **Perintah:**
+```
 Langkah 1
 -- Diminta: mendeteksi lonjakan baris per peran.
 -- Dipilih: menghitung aktivitas audit per pelaku.
@@ -1405,9 +1419,10 @@ SELECT
 FROM lab11.jejak_audit
 GROUP BY aksi
 ORDER BY jumlah_aktivitas DESC;
-
+```
 
 **Keluaran:**
+```
 Langkah 1
  pelaku | jumlah_perubahan 
 --------+------------------
@@ -1422,14 +1437,18 @@ Langkah 3
  aksi | jumlah_aktivitas 
 ------+------------------
 (0 rows)
+```
 
 **Alasan Keputusan:**
+```
 Keputusan menggunakan tiga jenis query pemeriksaan dipilih karena setiap query dapat menunjukkan pola aktivitas yang berbeda. Query pertama mengelompokkan jumlah perubahan berdasarkan pelaku untuk menemukan pengguna yang memiliki aktivitas tidak biasa atau jumlah perubahan yang jauh lebih tinggi dibandingkan pengguna lainnya. Query kedua memeriksa aktivitas yang terjadi di luar jam kerja menggunakan zona waktu Asia/Jakarta, sehingga aktivitas pada waktu yang tidak lazim dapat menjadi indikasi awal adanya akses mencurigakan. Query ketiga merangkum aktivitas berdasarkan jenis tindakan, seperti UPDATE dan DELETE, untuk membantu melihat pola perubahan data secara keseluruhan. Ketiga pemeriksaan ini digunakan sebagai sinyal awal untuk mendeteksi kemungkinan penyalahgunaan akses, bukan sebagai bukti pasti terjadinya serangan.
+```
 
 ---
 
 ### Q28
 **Perintah:**
+```
 Langkah 1
 -- Diminta: membuat tabel permintaan penghapusan data.
 -- Dipilih: DEFAULT now() + interval '72 hours'.
@@ -1456,9 +1475,10 @@ VALUES (12), (13);
 SELECT *
 FROM lab11.permintaan_hapus
 ORDER BY id;
-
+```
 
 **Keluaran:**
+```
 Langkah 1
 NOTICE:  relation "permintaan_hapus" already exists, skipping
 CREATE TABLE
@@ -1473,14 +1493,18 @@ INSERT 0 2
   1 |           12 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
   2 |           13 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
 (2 rows)
+```
 
 **Alasan Keputusan:**
+```
 Keputusan membuat tabel permintaan_hapus dipilih agar setiap permintaan penghapusan data pelanggan dapat dicatat dan dipantau sebelum proses penghapusan dilakukan. Kolom diterima_pada digunakan untuk mencatat waktu permintaan diterima, sedangkan kolom tenggat menggunakan nilai default now() + interval '72 hours' agar batas waktu penyelesaian dihitung secara otomatis sejak permintaan dibuat. Saya menggunakan DEFAULT, bukan GENERATED, karena tenggat merupakan nilai yang ditentukan berdasarkan waktu ketika permintaan dimasukkan, bukan hasil perhitungan yang harus selalu mengikuti perubahan kolom lain. Kolom status juga disediakan untuk membedakan permintaan yang masih menunggu dan yang sedang diproses.
+```
 
 ---
 
 ### Q29
 **Perintah:**
+```
 Langkah 1
 -- Diminta: menghapus data pelanggan 12 dan 13.
 -- Dipilih: memeriksa data dan transaksi sebelum penghapusan.
@@ -1538,8 +1562,10 @@ SELECT *
 FROM lab11.permintaan_hapus
 WHERE pelanggan_id IN (12, 13)
 ORDER BY id;
+```
 
 **Keluaran:**
+```
 Langkah 1
  id   | tenant_id | pelanggan_id |  jumlah  |         waktu          
 -------+-----------+--------------+----------+------------------------
@@ -1583,25 +1609,51 @@ Langkah 4
   1 |           12 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
   2 |           13 | 2026-11-18 18:41:43.138235+00 | 2026-11-21 18:41:43.138235+00 | menunggu
   3 |           12 | 2026-11-18 18:55:02.544196+00 | 2026-11-21 18:55:02.544196+00 | diproses
+```
 
 **Alasan Keputusan:**
+```
 Keputusan menghapus data transaksi terlebih dahulu sebelum menghapus data pelanggan dipilih untuk menjaga konsistensi hubungan antar-tabel dan menghindari pelanggaran foreign key. Proses penghapusan dilakukan dalam satu transaksi agar seluruh perubahan dapat berhasil bersama-sama atau dibatalkan apabila terjadi kesalahan. Sebelum penghapusan dilakukan, permintaan penghapusan dicatat agar prosesnya memiliki dokumentasi. Setelah itu, jumlah data yang tersisa pada tabel pelanggan dan transaksi diperiksa untuk memastikan data utama telah dihapus. Sementara itu, tabel audit tetap diperiksa untuk memastikan jejak aktivitas penghapusan masih tersedia, termasuk informasi lama seperti NIK yang tersimpan dalam catatan audit. Hal ini menunjukkan bahwa penghapusan data utama tidak serta-merta menghilangkan bukti aktivitas yang telah terjadi.
+```
 
 ---
 
 ### Q30
 **Perintah:**
 ```
-isi
+cat latihan/p11/q30_peta_uu_pdp.md
 ```
 
 **Keluaran:**
 ```
-isi
+# Q30 - Peta Tiket #1134 ke UU PDP
+
+## Tujuan
+Memetakan lima keluhan pada Tiket #1134
+dengan kewajiban atau hak dalam UU Nomor 27 Tahun 2022
+tentang Pelindungan Data Pribadi.
+
+## Pemetaan Keluhan
+
+| Keluhan | Pasal relevan | Kontrol teknis pencegah | Bukti |
+|---|---|---|---|
+| Keluhan 1: [isi dari Tiket #1134] | [pasal] | [kontrol praktikum] | [hasil Q...] |
+| Keluhan 2: [isi dari Tiket #1134] | [pasal] | [kontrol praktikum] | [hasil Q...] |
+| Keluhan 3: [isi dari Tiket #1134] | [pasal] | [kontrol praktikum] | [hasil Q...] |
+| Keluhan 4: [isi dari Tiket #1134] | [pasal] | [kontrol praktikum] | [hasil Q...] |
+| Keluhan 5: [isi dari Tiket #1134] | [pasal] | [kontrol praktikum] | [hasil Q...] |
+
+## Kesimpulan
+
+Kontrol teknis pada praktikum digunakan untuk membantu
+melindungi data pribadi, membatasi akses, mencatat aktivitas,
+dan menangani permintaan penghapusan data.
 ```
 
 **Alasan Keputusan:**
-Keputusan memetakan setiap keluhan pada Ticket #1134 ke pasal yang relevan dalam UU Nomor 27 Tahun 2022 dan kontrol teknis dari praktikum dipilih agar setiap permasalahan memiliki dasar hukum sekaligus solusi teknis yang jelas. Pemetaan dilakukan dengan melihat inti permasalahan pada masing-masing keluhan, kemudian menghubungkannya dengan ketentuan UU PDP yang sesuai. Kontrol teknis dipilih berdasarkan mekanisme yang telah diterapkan dalam praktikum, seperti pembatasan hak akses, isolasi data antar-tenant, pencatatan audit, pengamanan data, dan prosedur penghapusan. Dengan demikian, solusi yang diberikan tidak hanya menjelaskan kewajiban dari sisi regulasi, tetapi juga menunjukkan bagaimana kewajiban tersebut dapat diterapkan melalui mekanisme database.
+```
+Pemetaan lima keluhan Tiket #1134 dilakukan untuk mengidentifikasi pasal UU PDP yang relevan dengan setiap permasalahan serta menentukan kontrol teknis dari praktikum yang dapat digunakan untuk mencegah permasalahan tersebut.
+```
 
 ---
 
@@ -1611,9 +1663,9 @@ Keputusan memetakan setiap keluhan pada Ticket #1134 ke pasal yang relevan dalam
 Pada Q1, hak biasa bisa dicabut dari pemilik, tetapi risikonya tetap ada. Jelaskan dari data mengapa “mencabut hak” bukan jalan keluar untuk keluhan K1, dan apa yang menjadi jalan keluarnya.
 >> Data Q1 menunjukkan bahwa REVOKE UPDATE dari skema_owner memang membuat UPDATE ditolak (permission denied for table pelanggan). Tetapi satu GRANT UPDATE yang dijalankan skema_owner sendiri langsung mengembalikannya (UPDATE 1). Q2 memperlihatkan hal yang lebih mendasar: REVOKE DROP bahkan galat (unrecognized privilege type "drop"), karena kemampuan menghapus tabel melekat pada kepemilikan, bukan pada hak yang bisa dicabut.
 
-Karena itu mencabut hak bukan jalan keluar untuk K1. Selama aplikasi login sebagai pemilik, bug seperti DROP TABLE di modul laporan tetap dipatuhi basis data, dan setiap pencabutan bisa dibatalkan oleh pemilik itu sendiri.
+>> Karena itu mencabut hak bukan jalan keluar untuk K1. Selama aplikasi login sebagai pemilik, bug seperti DROP TABLE di modul laporan tetap dipatuhi basis data, dan setiap pencabutan bisa dibatalkan oleh pemilik itu sendiri.
 
-Jalan keluarnya memisahkan pemilik dari pemakai lewat peran berlapis. skema_owner memiliki tabel dan tidak pernah login. Hak dikumpulkan di peran fungsional (app_read, app_write) yang juga tidak login. Aplikasi login sebagai peran seperti app_laporan atau app_portal yang hanya meminjam hak dari lapis kedua. Data Q5 mendukung ini: tidak satu pun peran yang bisa login adalah pemilik, dan app_laporan hanya punya SELECT (pel_ins, pel_upd, pel_del bernilai f). Bila bug menjalankan DROP TABLE lewat peran itu, hasilnya hanya galat izin (must be owner of table), bukan tabel hilang.
+>> Jalan keluarnya memisahkan pemilik dari pemakai lewat peran berlapis. skema_owner memiliki tabel dan tidak pernah login. Hak dikumpulkan di peran fungsional (app_read, app_write) yang juga tidak login. Aplikasi login sebagai peran seperti app_laporan atau app_portal yang hanya meminjam hak dari lapis kedua. Data Q5 mendukung ini: tidak satu pun peran yang bisa login adalah pemilik, dan app_laporan hanya punya SELECT (pel_ins, pel_upd, pel_del bernilai f). Bila bug menjalankan DROP TABLE lewat peran itu, hasilnya hanya galat izin (must be owner of table), bukan tabel hilang.
 
 ### Refleksi B
 Dengan RLS aktif, apakah penyaring WHERE tenant_id di aplikasi masih perlu ditulis? Jelaskan tugas berbeda yang diemban keduanya, dengan menyebut rencana eksekusi.
@@ -1636,44 +1688,28 @@ Kesimpulan: lapis 2 sampai 4 adalah jaring pengaman bila lapis 1 lupa dipasang; 
 ---
 ### Refleksi D
 Sebuah tim menyatakan basis datanya aman karena semua kolom peka sudah dienkripsi. Sebutkan dua ancaman yang tetap terbuka dan satu risiko operasional enkripsi kolom, masing-masing dengan bukti dari Q21–Q24.
->>Pernyataan tim itu keliru, karena enkripsi kolom hanya melindungi data dari orang yang tidak punya kunci. Masih ada jalur lain yang terbuka.
+>> Pernyataan tim itu keliru, karena enkripsi kolom hanya melindungi data dari orang yang tidak punya kunci. Masih ada jalur lain yang terbuka.
 Ancaman 1: kunci dan teks terang bocor. Di Q22 varian A, pg_stat_activity menampilkan kunci dan teks terang secara utuh. Varian B menyembunyikan nilai kunci, tetapi SET kunci tetap bisa tercatat di log server atau pg_stat_statements. Di Q21 kolom rekening asli juga masih ada di samping rekening_enc.
 
-Ancaman 2: re-identifikasi lewat kolom yang tidak dienkripsi. Di Q24, kombinasi (kota, lahir) ada 18000 dan 6000 di antaranya hanya satu orang. Generalisasi ke tahun menurunkannya ke 250 (turun 98,61%), tetapi dua query agregat yang selisihnya mengungkap satu orang beserta saldonya tetap bisa dilakukan. Enkripsi tidak mencegah ini.
+>> Ancaman 2: re-identifikasi lewat kolom yang tidak dienkripsi. Di Q24, kombinasi (kota, lahir) ada 18000 dan 6000 di antaranya hanya satu orang. Generalisasi ke tahun menurunkannya ke 250 (turun 98,61%), tetapi dua query agregat yang selisihnya mengungkap satu orang beserta saldonya tetap bisa dilakukan. Enkripsi tidak mencegah ini. 
 
-Risiko operasional: kolom terenkripsi tidak bisa dicari atau diindeks. Di Q21, dua enkripsi dari nilai dan kunci yang sama menghasilkan ciphertext berbeda (sama = f), jadi WHERE =, JOIN, dan indeks tidak bisa dipakai. Selain itu, kunci yang hilang berarti data hilang.
+>> Risiko operasional: kolom terenkripsi tidak bisa dicari atau diindeks. Di Q21, dua enkripsi dari nilai dan kunci yang sama menghasilkan ciphertext berbeda (sama = f), jadi WHERE =, JOIN, dan indeks tidak bisa dipakai. Selain itu, kunci yang hilang berarti data hilang.
+
 ---
 ### Refleksi E
 Jejak audit memuat NIK lama di nilai_lama. Jelaskan ketegangan antara kewajiban merekam pemrosesan (Pasal 31) dan kewajiban menghapus data (Pasal 43), lalu usulkan satu penyelesaian yang dapat Anda pertahankan di hadapan pemeriksa.
->> Terdapat ketegangan antara kewajiban mencatat pemrosesan
-data pribadi dalam Pasal 31 UU PDP dan kewajiban
-menghapus data pribadi dalam Pasal 43 UU PDP.
-
-Tabel jejak_audit digunakan untuk menyimpan riwayat
-aktivitas perubahan data sebagai bukti dan bahan
-pemeriksaan. Namun, tabel tersebut dapat menyimpan
-nilai lama yang masih mengandung informasi pribadi,
-seperti NIK, meskipun data pelanggan sudah dihapus
-dari tabel utama.
-
-Salah satu penyelesaian yang dapat diterapkan adalah
-melakukan penyamaran atau penghapusan informasi pribadi
-pada catatan audit setelah kebutuhan penyimpanan
-dan kewajiban retensinya berakhir. Catatan aktivitas
-yang tidak mengandung identitas pribadi tetap dapat
-dipertahankan sesuai kebutuhan audit dan ketentuan
-retensi yang berlaku.
+>> Terdapat ketegangan antara kewajiban mencatat pemrosesan data pribadi dalam Pasal 31 UU PDP dan kewajiban menghapus data pribadi dalam Pasal 43 UU PDP. Tabel jejak_audit digunakan untuk menyimpan riwayat aktivitas perubahan data sebagai bukti dan bahan pemeriksaan. Namun, tabel tersebut dapat menyimpan nilai lama yang masih mengandung informasi pribadi, seperti NIK, meskipun data pelanggan sudah dihapus dari tabel utama. Salah satu penyelesaian yang dapat diterapkan adalah melakukan penyamaran atau penghapusan informasi pribadi pada catatan audit setelah kebutuhan penyimpanan dan kewajiban retensinya berakhir. Catatan aktivitas yang tidak mengandung identitas pribadi tetap dapat dipertahankan sesuai kebutuhan audit dan ketentuan retensi yang berlaku.
 
 ---
 
 ## Peta Tiket #1134 ke UU PDP
 | Keluhan | Pasal relevan | Kontrol teknis pencegah | Bukti |
 |---|---|---|---|
-| Keluhan 1: [Satu akun aplikasi (app_admin) memegang seluruh kunci (pemilik semua tabel), sehingga bug di modul laporan menjalankan DROP TABLE dan basis data mematuhinya.] | [Pasal 35 UU No. 27 Tahun 2022 (kewajiban melindungi dan mengamankan data pribadi)] | [Peran berlapis (skema_owner tanpa login, peran fungsional app_read/app_write, dan peran login terpisah seperti app_laporan/app_portal dengan hak minimum).] | [Hasil Q1, Q2, dan Q5 (pemilik bisa mengatur/mengembalikan hak atau memegang hak bawaan DROP, sedangkan peran login seperti app_laporan ditolak saat DROP TABLE / UPDATE).] |
-| Keluhan 2: [Penyewa A membaca data penyewa B selama sebelas hari karena satu endpoint laporan lupa menulis WHERE tenant_id.] | [Pasal 35 UU No. 27 Tahun 2022 (kewajiban melindungi dan mengamankan data pribadi dari akses yang tidak sah)] | [Row-Level Security (RLS) dengan CREATE POLICY (USING / WITH CHECK), FORCE ROW LEVEL SECURITY, dan konteks SET LOCAL di dalam transaksi.] | [Hasil Q6–Q11 (isolasi antar-penyewa dengan RLS, FORCE RLS, SET LOCAL, serta pencegahan kebocoran lintas penyewa / SECURITY DEFINER / connection pool).] |
-| Keluhan 3: [Kotak pencarian menerima tanda kutip dan merangkai query dengan penyambungan string, sehingga masukan sederhana membuka seluruh baris/tabel termasuk kolom yang tak dimaksudkan tampil.] | [Pasal 39 UU No. 27 Tahun 2022 (kewajiban menjaga kerahasiaan data pribadi)] | [Query berparameter ($1 / %s) untuk memisahkan perintah dan data, serta daftar putih (whitelist) untuk pengenal seperti kolom atau arah urut.] | [Hasil Q12–Q17 (perbandingan sambungan string vs query berparameter, daftar putih ORDER BY, dan second-order injection).] |
-| Keluhan 4: [Cadangan berpindah tangan tanpa perlindungan (pg_dump dan arsip WAL berisi NIK dan nomor rekening teks biasa disalin ke flash disk laptop analis yang tak tercatat).] | [Pasal 35 UU No. 27 Tahun 2022 (kewajiban melindungi dan mengamankan data pribadi)] | [Enkripsi saat diam / enkripsi berkas cadangan, penyamaran salinan data (view tersamar / dump tersamar), serta pencatatan pemegang salinan.] | [Hasil Q21–Q24 (pgp_sym_encrypt pada rekening_enc, pemeriksaan aktivitas/log pada Q22, akses tersamar via v_pelanggan_samar pada Q23, serta uji irisan kuasi-pengidentifikasi/agregat pada Q24).] |
-| Keluhan 5: [Permintaan hapus datang, baris di tabel utama hilang tapi data masih ada di cadangan, replica, dan ekspor, serta siapa yang pernah membaca tidak tercatat.] | [Pasal 43 (hak menghapus data pribadi) dan Pasal 31 (kewajiban merekam kegiatan pemrosesan) UU No. 27 Tahun 2022] | [Pencatatan permintaan hapus sebagai data, jadwal retensi dan penerapan ulang daftar hapus saat pemulihan, serta jejak audit lewat trigger SECURITY DEFINER.] | [Q25–Q29 (jejak_audit + trigger rekam_audit() SECURITY DEFINER pada Q25–Q27, serta tabel permintaan_hapus dan penghapusan data uji pada Q28–Q29).] |
+| Keluhan 1: Satu akun aplikasi (app_admin) memegang seluruh kunci (pemilik semua tabel), sehingga bug di modul laporan menjalankan DROP TABLE dan basis data mematuhinya. | Pasal 35 UU No. 27 Tahun 2022 (kewajiban melindungi dan mengamankan data pribadi) | Peran berlapis (skema_owner tanpa login, peran fungsional app_read/app_write, dan peran login terpisah seperti app_laporan/app_portal dengan hak minimum). | Hasil Q1, Q2, dan Q5 (pemilik bisa mengatur/mengembalikan hak atau memegang hak bawaan DROP, sedangkan peran login seperti app_laporan ditolak saat DROP TABLE / UPDATE). |
+| Keluhan 2: Penyewa A membaca data penyewa B selama sebelas hari karena satu endpoint laporan lupa menulis WHERE tenant_id. | Pasal 35 UU No. 27 Tahun 2022 (kewajiban melindungi dan mengamankan data pribadi dari akses yang tidak sah) | Row-Level Security (RLS) dengan CREATE POLICY (USING / WITH CHECK), FORCE ROW LEVEL SECURITY, dan konteks SET LOCAL di dalam transaksi. | Hasil Q6–Q11 (isolasi antar-penyewa dengan RLS, FORCE RLS, SET LOCAL, serta pencegahan kebocoran lintas penyewa / SECURITY DEFINER / connection pool). |
+| Keluhan 3: Kotak pencarian menerima tanda kutip dan merangkai query dengan penyambungan string, sehingga masukan sederhana membuka seluruh baris/tabel termasuk kolom yang tak dimaksudkan tampil. | Pasal 39 UU No. 27 Tahun 2022 (kewajiban menjaga kerahasiaan data pribadi) | Query berparameter ($1 / %s) untuk memisahkan perintah dan data, serta daftar putih (whitelist) untuk pengenal seperti kolom atau arah urut. | Hasil Q12–Q17 (perbandingan sambungan string vs query berparameter, daftar putih ORDER BY, dan second-order injection). |
+| Keluhan 4: Cadangan berpindah tangan tanpa perlindungan (pg_dump dan arsip WAL berisi NIK dan nomor rekening teks biasa disalin ke flash disk laptop analis yang tak tercatat). | Pasal 35 UU No. 27 Tahun 2022 (kewajiban melindungi dan mengamankan data pribadi) | Enkripsi saat diam / enkripsi berkas cadangan, penyamaran salinan data (view tersamar / dump tersamar), serta pencatatan pemegang salinan. | Hasil Q21–Q24 (pgp_sym_encrypt pada rekening_enc, pemeriksaan aktivitas/log pada Q22, akses tersamar via v_pelanggan_samar pada Q23, serta uji irisan kuasi-pengidentifikasi/agregat pada Q24). |
+| Keluhan 5: Permintaan hapus datang, baris di tabel utama hilang tapi data masih ada di cadangan, replica, dan ekspor, serta siapa yang pernah membaca tidak tercatat. | Pasal 43 (hak menghapus data pribadi) dan Pasal 31 (kewajiban merekam kegiatan pemrosesan) UU No. 27 Tahun 2022 | Pencatatan permintaan hapus sebagai data, jadwal retensi dan penerapan ulang daftar hapus saat pemulihan, serta jejak audit lewat trigger SECURITY DEFINER. | Q25–Q29 (jejak_audit + trigger rekam_audit() SECURITY DEFINER pada Q25–Q27, serta tabel permintaan_hapus dan penghapusan data uji pada Q28–Q29). |
 
 ---
 
@@ -1685,13 +1721,17 @@ sendiri di jaringan tertutup. (tanda tangan tiap anggota)
 
 ## Penggunaan AI dan Verifikasi
 **Langkah 1 dan 2:** Untuk tahap awal pengerjaan mulai dari setup kontainer Docker hingga penyusunan query pada soal Q1 sampai Q5, aku mengandalkan eksplorasi mandiri dengan mencocokkan referensi dari modul materi kuliah serta dokumentasi resmi PostgreSQL. Beberapa kendala sintaksis sempat kami selesaikan melalui proses trial and error langsung di terminal kontainer lab11. Seluruh hasil kueri juga sudah diuji coba dan dicocokkan keluarannya secara teliti sebelum dimasukkan ke dalam laporan.
+
 **Langkah 3:** Penggunaan AI membantu mengatasi berbagai kendala teknis dan kesalahan perintah terminal Git Bash, seperti galat jalur direktori No such file or directory yang diselesaikan menggunakan variabel MSYS_NO_PATHCONV=1 serta pembersihan teks salinan yang keliru. Seluruh perintah terminal dan skrip SQL tersebut kemudian diverifikasi serta diuji secara mandiri melalui kontainer Docker lokal untuk memastikan seluruh rangkaian proses berjalan lancar tanpa galat.
+
 **Langkah 4:** Memakai Claude (Anthropic) sebagai bantuan menyusun draf kode, berkas SQL, dan laporan. Seluruh berkas kemudian dijalankan
 ulang oleh kami di kontainer lab11, dan keluarannya dicocokkan dengan
 isi laporan. Hasil akhir kami baca dan pahami sendiri sebelum dikumpulkan.
+
 **Langkah 5:** Digunakan hanya untuk memperoleh referensi ataupun penjelasan ulang tentang hal yang harus di lakukan, juga membatu pada penerapa query yang salah ataupun membuat query yang benar dan yang di perluakan.
-**Langkah 6:**
+
+**Langkah 6:** Penggunaan ai pada langkah 6 itu untuk menentukan langkah serta urutan query yang harus dijalankan
 
 ---
 
-**merge request :** 
+**merge request :** https://github.com/dwicharima/K2_MSBD/pull/3
